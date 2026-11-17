@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Le modèle des pompes</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" crossorigin="anonymous">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" crossorigin="anonymous"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" crossorigin="anonymous"
+    onload="renderMathInElement(document.body,{delimiters:[{left:'$$',right:'$$',display:true},{left:'\\(',right:'\\)',display:false}]})"></script>
+  <style>
+    /* Mise en page : une colonne de lecture, équations centrées, tableaux défilants sur téléphone */
+    :root {
+      --bg: #0f1214; --surf: #181c1f; --ink: #f0efec; --ink2: #c9c8be; --muted: #8b8f93; --line: #2c3338; --accent: #f97316; --link: #7cb7f8;
+      --read: 68ch; color-scheme: dark;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--ink2); font: 16px/1.62 system-ui, -apple-system, "Segoe UI", sans-serif; }
+    .wrap { max-width: calc(var(--read) + 32px); margin: 0 auto; padding-block: 28px 64px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+    a { color: var(--link); }
+    .back { font-size: 14px; text-decoration: none; }
+    h1 { color: var(--ink); font-size: 30px; line-height: 1.2; margin: 18px 0 6px; text-wrap: balance; }
+    .lede { font-size: 17px; color: var(--ink2); margin: 0 0 8px; }
+    h2 { color: var(--ink); font-size: 20px; margin: 40px 0 8px; padding-top: 14px; border-top: 1px solid var(--line); text-wrap: balance; }
+    h2 small { color: var(--accent); font-size: 13px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; display: block; margin-bottom: 2px; }
+    h3 { color: var(--ink); font-size: 16px; margin: 22px 0 4px; }
+    p, li { max-width: var(--read); }
+    .katex-display { overflow-x: auto; overflow-y: hidden; padding: 4px 0; }
+    .katex { color: var(--ink); }
+    .note { border-left: 3px solid var(--accent); background: var(--surf); padding: 10px 14px; border-radius: 0 8px 8px 0; margin: 16px 0; }
+    .tbl { overflow-x: auto; margin: 12px 0; }
+    table { border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; min-width: 420px; }
+    th, td { border-bottom: 1px solid var(--line); padding: 6px 10px; text-align: left; vertical-align: top; }
+    th { color: var(--ink); font-weight: 600; }
+    td.n { text-align: right; }
+    ol.chain li { margin: 4px 0; }
+    .refs li { font-size: 14px; margin: 6px 0; }
+    code { background: var(--surf); padding: 1px 5px; border-radius: 4px; font-size: 14px; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="./">← Retour à la carte</a>
+  <h1>Le modèle des pompes, de l'énergie solaire au vario</h1>
+  <p class="lede">Cette page décrit, équation par équation, ce que calcule la carte. Elle vise un lecteur à l'aise avec la physique de licence ; les ordres de grandeur sont donnés pour une belle journée d'été en Savoie.</p>
+
+  <div class="note">Le modèle n'est pas encore recalé sur des vols. Les coefficients marqués « à recaler » et les incertitudes « a priori » seront ajustés avec des plafonds et des Vz relevés massif par massif.</div>
+
+  <h2><small>Vue d'ensemble</small>La chaîne de calcul</h2>
+  <ol class="chain">
+    <li>Rayonnement reçu par chaque pente de 150 m, ombres portées comprises.</li>
+    <li>Bilan d'énergie du sol : part du rayonnement rendue à l'air sous forme de chaleur sensible \(H\).</li>
+    <li>Sommet de la couche convective, repris du modèle météo et réparti sur le relief fin ; base des cumulus.</li>
+    <li>Brises de pente : où convergent-elles, et combien de chaleur ont-elles ramassée en montant ?</li>
+    <li>Structure d'un thermique et Vz d'un planeur qui y spirale.</li>
+    <li>Pompes : maxima locaux de l'indice de déclenchement.</li>
+    <li>Incertitudes par tirage aléatoire : fourchettes à 95 %, ellipse de position, probabilité.</li>
+  </ol>
+  <p>Tout est recalculé dans le navigateur, heure par heure, sur environ 630 000 mailles. Aucun serveur n'intervient en dehors du service météo.</p>
+
+  <h2><small>Entrées</small>Relief et météo</h2>
+  <p><b>Relief.</b> Le modèle numérique de terrain SRTM à une seconde d'arc (environ 30 m) est moyenné sur une grille métrique de 150 m, de Voreppe au Mont-Blanc et de Grenoble à Samoëns. La nature du sol est déduite du relief (pente, altitude, niveau des lacs) en six classes : lac, forêt, fond de vallée, alpage, rocher, glacier. C'est une approximation : une carte d'occupation des sols réelle ferait mieux.</p>
+  <p><b>Météo.</b> Le service <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> fournit, sur un treillis de 7 × 7 points espacés d'environ 16 km, les variables horaires de surface (rayonnements direct et diffus, flux de chaleur sensible, hauteur de couche limite, humidité du sol, neige, nébulosité, pluie, CAPE, vent à 10 m) et les profils sur neuf niveaux de pression (température, géopotentiel, point de rosée, vent). La requête désactive la correction d'altitude : on obtient les valeurs brutes de chaque maille du modèle et son altitude réelle, indispensable pour situer la couche convective. Le même service donne les archives de prévisions depuis 2022.</p>
+  <p>Entre les points du treillis, les grandeurs sont interpolées linéairement. Celles qui dépendent fortement de l'altitude (température potentielle, humidité, sommet de la convection) sont d'abord écrites sous la forme \(y = b\,z + r\) : la pente \(b\) est ajustée sur les 49 mailles, seul le résidu \(r\) est interpolé, puis on rajoute \(b\,z\) avec l'altitude locale.</p>
+
+  <h2><small>Étape 1</small>Le rayonnement sur une pente</h2>
+  <p>Pour une maille de normale \(\hat n\) et un soleil dans la direction \(\hat s\), l'éclairement de courte longueur d'onde vaut</p>
+  $$S = I_b\,\max(0,\hat n\cdot\hat s)\,\ell \;+\; D\,V \;+\; 0{,}2\,G\,(1-V)$$
+  <p>avec \(I_b\) le rayonnement direct normal, \(D\) le diffus, \(G\) le global, \(\ell\in[0,1]\) la part éclairée (ombres portées) et \(V\) le facteur de vue du ciel. Le dernier terme est la lumière renvoyée par les versants voisins, avec un albédo moyen de 0,2.</p>
+  <p>Le facteur de vue du ciel est calculé une fois pour toutes à partir de l'angle d'horizon \(h_k\) dans 16 directions :</p>
+  $$V = \frac{1}{16}\sum_{k=1}^{16}\cos^2 h_k$$
+  <p><b>Ombres portées.</b> Pour chaque heure, on balaie la grille dans le sens des ombres. Le long de chaque rayon, on propage l'altitude de la « surface d'ombre » \(M\), qui descend de \(\Delta s\,\tan e\) à chaque pas (\(e\) : hauteur du soleil) :</p>
+  $$M_{k} = \max\!\big(z_k,\; M_{k-1} - \Delta s\,\tan e\big)$$
+  <p>Une maille est à l'ombre si \(z_k < M_{k-1} - \Delta s\,\tan e\), avec une transition douce sur une trentaine de mètres. Le calcul est linéaire en nombre de mailles : quelques millisecondes par heure.</p>
+
+  <h2><small>Étape 2</small>Le bilan d'énergie du sol</h2>
+  <p>Le rayonnement net est</p>
+  $$R_n = (1-\alpha)\,S - L^{*}, \qquad L^{*} = 95 - 55\,\frac{c_{\text{bas}}}{100}\ \text{W/m}^2$$
+  <p>où \(L^{*}\) est la perte nette en grandes longueurs d'onde, réduite par les nuages bas \(c_{\text{bas}}\) (en %). Il se partage entre le flux dans le sol \(G_s = g\,R_n\), le flux de chaleur sensible \(H\) et la chaleur latente d'évaporation \(LE\). Le rapport de Bowen \(\beta = H/LE\) fixe le partage :</p>
+  $$H = (1-g)\,R_n\,\frac{\beta}{1+\beta}$$
+  <div class="tbl"><table>
+    <thead><tr><th>Sol</th><th>Albédo \(\alpha\)</th><th>Bowen \(\beta\)</th><th>Part dans le sol \(g\)</th></tr></thead>
+    <tbody>
+      <tr><td>Forêt</td><td class="n">0,13</td><td class="n">0,7</td><td class="n">0,08</td></tr>
+      <tr><td>Fond de vallée, cultures</td><td class="n">0,20</td><td class="n">0,8</td><td class="n">0,12</td></tr>
+      <tr><td>Alpage</td><td class="n">0,20</td><td class="n">1,2</td><td class="n">0,12</td></tr>
+      <tr><td>Rocher, éboulis</td><td class="n">0,25</td><td class="n">5</td><td class="n">0,25</td></tr>
+      <tr><td>Neige</td><td class="n">0,60</td><td class="n">0,15</td><td class="n">—</td></tr>
+      <tr><td>Lac, glacier</td><td colspan="3">pas de flux vers le haut (l'air est plus chaud que la surface)</td></tr>
+    </tbody>
+  </table></div>
+  <p>Le rapport de Bowen est modulé par l'humidité du sol \(\theta_s\) prévue : multiplié par 1,5 pour un sol sec (\(\theta_s\le 0{,}10\)), par 0,6 pour un sol humide (\(\theta_s\ge 0{,}35\)). Enfin, le champ \(H\) est multiplié par un facteur unique (borné entre 0,4 et 1,6) pour que sa moyenne autour de chaque point du treillis égale le flux de chaleur sensible du modèle météo. Le modèle météo donne le niveau, le relief fin donne la répartition.</p>
+  <p>Avant de servir aux thermiques, \(H\) est moyenné sur environ 1 km : une bulle ne naît pas d'une seule maille mais de la surface qui l'alimente.</p>
+
+  <h2><small>Étape 3</small>Le sommet de la convection et la base des cumulus</h2>
+  <p>Les niveaux de pression du modèle sont espacés de 500 à 1 000 m en montagne (850, 800, 700 hPa). Une méthode de la particule appliquée à ces profils lisse l'inversion qui coiffe la couche convective et place son sommet trop bas. On reprend donc directement la couche limite du modèle : son sommet vaut l'altitude de la maille plus la hauteur de couche limite, régressé sur l'altitude des mailles (pente comprise entre 0 et 1,1) puis évalué avec le relief lissé sur 2 km, \(\bar z\).</p>
+  <p>La convection part du pied des versants plutôt que du sommet : on prend comme base \(z_b = \min(z, \bar z)\), et l'épaisseur de la couche brassée est \(z_i = z_t - z_b\).</p>
+  <p><b>Base des cumulus.</b> Une particule part du sol avec un excès de température \(\Delta T = 0{,}4 + 1{,}6\,\min(1, H/300)\) K et un rapport de mélange pris à 60 % en surface et à 40 % dans le premier tiers de la couche (mélange par les thermiques). Son niveau de condensation est</p>
+  $$z_{\text{LCL}} \simeq z_b + 125\ \text{m/K}\times (T_p - T_d)$$
+  <p>S'il est sous le sommet de la convection, la journée est à cumulus et le plafond est la base ; sinon les thermiques sont bleus et le plafond utilisable est pris à 95 % de la couche.</p>
+
+  <h2><small>Étape 4</small>Les brises de pente</h2>
+  <p>Un versant chauffé engendre une brise montante dont l'intensité croît avec le flux de chaleur et la pente. On la représente par le champ sans dimension</p>
+  $$\vec a = \min\!\Big(1,\frac{H}{320}\Big)\,\min\!\Big(1,\frac{\tan\gamma}{0{,}35}\Big)\,\hat u$$
+  <p>où \(\gamma\) est la pente et \(\hat u\) la direction de la montée sur le relief lissé à 200 m. Les brises se rejoignent là où ce champ converge, c'est-à-dire où \(C = -\nabla\cdot\vec a\) est positif : crêtes, sommets, éperons.</p>
+  <p>Une convergence ne suffit pas : il faut aussi que la brise ait ramassé de la chaleur. On cumule, en remontant chaque ligne de plus grande pente, le flux \(H\) pondéré par la pente, avec une perte de 5 % tous les 120 m (environ 4 km de mémoire) :</p>
+  $$F_k = H_k\,\min\!\Big(1,\frac{\tan\gamma_k}{0{,}30}\Big) + 0{,}95^{\,\Delta x/120}\,F_{k-1}$$
+  <p>L'indice de convergence combine les deux :</p>
+  $$c = \operatorname{clip}_{[0,1]}\!\Big(\frac{C}{C_0}\Big)\times\min\!\Big(1{,}25,\frac{F}{F_0}\Big)$$
+  <p>Un long versant ensoleillé terminé par une arête nette donne \(c\approx 1\) ; une butte isolée ou un plateau donne \(c\) faible.</p>
+
+  <h2><small>Étape 5</small>Du thermique au vario</h2>
+  <h3>Vitesse convective</h3>
+  <p>L'échelle de vitesse de la couche convective (Deardorff) est</p>
+  $$w_* = \Big(\frac{g}{\theta}\,\frac{H}{\rho c_p}\,z_i\Big)^{1/3}$$
+  <p>avec \(\theta\approx 300\) K et \(\rho c_p\approx 1105\) J m⁻³ K⁻¹ (air à environ 1 500 m). Pour \(H = 300\) W/m² et \(z_i = 2\,000\) m, \(w_*\approx 2{,}6\) m/s.</p>
+  <h3>Profil d'un thermique</h3>
+  <p>On suit le modèle d'Allen (2006), tiré de mesures en plaine. À la hauteur relative \(\zeta = z/z_i\) :</p>
+  $$\bar w = w_*\,\zeta^{1/3}(1-1{,}1\,\zeta), \qquad r_2 = 0{,}102\,\zeta^{1/3}(1-0{,}25\,\zeta)\,z_i$$
+  $$w_{\text{cœur}} = 3\,\bar w\,\frac{1-q}{1-q^{3}}, \qquad q = \frac{r_1}{r_2} = 0{,}0011\,r_2 + 0{,}14$$
+  <p>\(\bar w\) est la vitesse moyenne dans le thermique, \(r_2\) son rayon extérieur. En montagne, la convergence des brises concentre et renforce le thermique ; on multiplie le cœur par \((1 + a\,c)\) et le rayon par \((1+\rho\,c)\), avec \(a = 1\) et \(\rho = 0{,}25\) (à recaler). Le profil radial est pris gaussien :</p>
+  $$w(r) = w_{\text{cœur}}\,(1+a\,c)\;\exp\!\Big[-\Big(\frac{r}{R}\Big)^2\Big], \qquad R = 0{,}75\,r_2\,(1+\rho\,c)$$
+  <h3>Le planeur en spirale</h3>
+  <p>À 90 km/h (\(V = 25\) m/s) et 45° d'inclinaison, le rayon de virage est</p>
+  $$r_v = \frac{V^2}{g\tan\varphi} = 63{,}7\ \text{m}$$
+  <p>Le facteur de charge vaut \(n = 1/\cos\varphi = \sqrt 2\). La polaire d'un planeur de classe standard est approchée par une traînée de profil en \(V^3\) et une traînée induite en \(n^2/V\) :</p>
+  $$s(V,n) = a_p V^3 + b_p\,\frac{n^2}{V}, \qquad a_p = 2{,}38\times10^{-5},\; b_p = 8{,}02$$
+  <p>ajustée sur 0,60 m/s à 75 km/h et 0,80 m/s à 100 km/h en ligne droite. En spirale : \(s = 0{,}37 + 0{,}64 = 1{,}01\) m/s.</p>
+  <p>La Vz affichée est ce qu'indique le vario, moyennée sur trois hauteurs de la couche (30, 50 et 70 %) :</p>
+  $$V_z = \big\langle\, w(r_v) - s \,\big\rangle_{\zeta\in\{0{,}3;\,0{,}5;\,0{,}7\}}$$
+  <p>Elle est plus faible que la vitesse au cœur (donnée au clic) : on ne spirale pas dans l'axe, et le planeur descend dans la masse d'air. Un vent de plus de 9 m/s dans la couche hache les thermiques (Vz réduite jusqu'à 40 %), une averse les éteint presque (× 0,35).</p>
+
+  <h2><small>Étape 6</small>Les pompes</h2>
+  <p>L'indice de déclenchement \(\;\mathcal{I} = V_z\,(0{,}3 + c)\,\big(0{,}6 + 0{,}4\min(1, F/F_0)\big)\;\) est lissé, puis on retient ses maxima locaux, d'abord les plus forts, en imposant 1,65 km entre deux pompes (300 au plus). Le point affiché est le point de départ au sol ; le trait montre la dérive jusqu'au plafond, durée de montée de l'air multipliée par le vent dans la couche.</p>
+
+  <h2><small>Étape 7</small>Incertitudes à 95 % et probabilité</h2>
+  <p>Chaque pompe est recalculée 300 fois en tirant au hasard les erreurs des entrées. Les écarts types sont des estimations a priori, qui seront revues avec les observations :</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Grandeur</th><th>Erreur tirée</th></tr></thead>
+    <tbody>
+      <tr><td>Flux de chaleur \(H\)</td><td>facteur log-normal, ± 25 %</td></tr>
+      <tr><td>Épaisseur de la couche \(z_i\)</td><td>± 15 %</td></tr>
+      <tr><td>Renforcement par la convergence</td><td>± 35 %</td></tr>
+      <tr><td>Rayon du thermique</td><td>± 25 %</td></tr>
+      <tr><td>Chute du planeur en spirale</td><td>± 0,1 m/s</td></tr>
+      <tr><td>Vent dans la couche</td><td>± 30 % et ± 0,8 m/s ; direction ± 20°</td></tr>
+      <tr><td>Base des cumulus</td><td>± 190 m (± 1,5 K sur \(T_p - T_d\))</td></tr>
+      <tr><td>Point de déclenchement</td><td>étendue de la zone favorable (mailles à plus de 70 % du maximum dans un rayon de 1,2 km) + 250 m</td></tr>
+    </tbody>
+  </table></div>
+  <p><b>Fourchettes.</b> Les bornes affichées pour la Vz et le plafond sont les quantiles 2,5 % et 97,5 % des 300 tirages.</p>
+  <p><b>Ellipse.</b> Pour chaque tirage, on calcule où se trouve le thermique à mi-hauteur de la bande exploitable : point de départ décalé, plus la dérive \(\vec U\,t\) avec \(t = \tfrac12(z_{\text{plafond}} - z)/w(r_v)\). La matrice de covariance \(\Sigma\) de ces positions a pour valeurs propres \(\lambda_1\ge\lambda_2\). Pour une loi normale à deux dimensions, \((\vec x - \vec\mu)^{\mathsf T}\Sigma^{-1}(\vec x-\vec\mu)\) suit une loi du \(\chi^2\) à deux degrés de liberté ; le contour à 95 % est l'ellipse de demi-axes</p>
+  $$a = \sqrt{5{,}991\,\lambda_1}, \qquad b = \sqrt{5{,}991\,\lambda_2}$$
+  <p>orientée selon le premier vecteur propre. Elle s'allonge le long des crêtes (le déclenchement peut glisser sur l'arête) et dans l'axe du vent (la dérive est mal connue).</p>
+  <p><b>Probabilité.</b> Elle combine deux facteurs :</p>
+  $$P = P_{\text{dév}}\times P_{\text{site}}$$
+  <ul>
+    <li>\(P_{\text{dév}}\) : part des tirages où le thermique est exploitable, c'est-à-dire \(V_z\ge 0{,}5\) m/s et au moins 300 m de gain possible.</li>
+    <li>\(P_{\text{site}} = 0{,}25 + 0{,}65\,\min(1,c)\,(0{,}4 + 0{,}6\,p)\) : chances que le déclenchement se fasse bien là. \(p\) mesure combien la pompe ressort de son voisinage (1 moins le rapport entre l'indice moyen à 1,2–2,4 km et l'indice au maximum).</li>
+  </ul>
+  <div class="note">\(P_{\text{site}}\) est une hypothèse de travail, pas une fréquence mesurée. Une probabilité annoncée de 70 % ne sera « vraie » qu'après recalage : sur l'ensemble des pompes annoncées à 70 %, environ 7 sur 10 devront avoir été trouvées. C'est ce que permettront vos relevés (diagramme de fiabilité, score de Brier).</div>
+
+  <h2><small>Recalage</small>Ce que les observations permettront d'ajuster</h2>
+  <ul>
+    <li>Plafonds relevés par massif : le biais sur le sommet de la convection et la base des cumulus, et l'écart type de \(z_i\).</li>
+    <li>Vz relevées dans des pompes connues : les coefficients \(a\) et \(\rho\) du renforcement en montagne, et l'écart type correspondant.</li>
+    <li>Pompes trouvées ou absentes : la loi \(P_{\text{site}}\), puis la vérification que les ellipses contiennent bien 95 % des thermiques.</li>
+  </ul>
+
+  <h2><small>Limites</small>Ce que le modèle ne fait pas</h2>
+  <ul>
+    <li>La flottabilité est calculée en température potentielle, sans l'effet de la vapeur d'eau. Or l'air humide est plus léger : \(\theta_v \simeq \theta\,(1 + 0{,}61\,r)\). Un écart de 2 g/kg vaut environ 0,4 K, autant que l'excès de température d'un thermique faible. Predelli et Niederhagen (2021) et les simulations de Maas et Etling (2021) montrent que cette contribution n'est pas négligeable, surtout dans le haut de la couche.</li>
+    <li>Pas de dynamique propre : ni effets de foehn, ni ondes, ni brises de vallée, ni confluences de vallées à grande échelle. Le vent est celui du modèle météo, lissé à 16 km.</li>
+    <li>Nature du sol déduite du relief, sans carte d'occupation réelle.</li>
+    <li>Thermiques supposés stationnaires sur l'heure : pas de cycle de vie, pas de rues de nuages.</li>
+    <li>La qualité finale dépend d'abord de la prévision météo elle-même (nébulosité, humidité du sol, hauteur de couche limite).</li>
+  </ul>
+
+  <h2><small>Sources</small>Références</h2>
+  <ul class="refs">
+    <li>M. J. Allen, <i>Updraft Model for Development of Autonomous Soaring Uninhabited Air Vehicles</i>, AIAA 2006-1510, 2006.</li>
+    <li>J. W. Deardorff, <i>Convective velocity and temperature scales for the unstable planetary boundary layer and for Rayleigh convection</i>, J. Atmos. Sci. 27, 1970.</li>
+    <li>R. B. Stull, <i>An Introduction to Boundary Layer Meteorology</i>, Kluwer, 1988.</li>
+    <li>C. D. Whiteman, <i>Mountain Meteorology: Fundamentals and Applications</i>, Oxford University Press, 2000.</li>
+    <li>H. Predelli, C. Niederhagen, <i>Humidity, the Dominating Force of Thermal Updrafts</i>, Technical Soaring 45(1), 2021.</li>
+    <li>H. Maas, D. Etling, simulations des grandes structures de la convection sèche et humide pour le vol à voile, 2021.</li>
+    <li>Données : <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0) ; relief SRTM (NASA, USGS).</li>
+  </ul>
+  <p style="margin-top:32px"><a class="back" href="./">← Retour à la carte</a></p>
+</div>
+</body>
+</html>
