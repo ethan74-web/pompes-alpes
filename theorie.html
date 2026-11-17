@@ -45,7 +45,7 @@
   <h1>Le modèle des pompes, de l'énergie solaire au vario</h1>
   <p class="lede">Cette page décrit, équation par équation, ce que calcule la carte. Elle vise un lecteur à l'aise avec la physique de licence ; les ordres de grandeur sont donnés pour une belle journée d'été en Savoie.</p>
 
-  <div class="note">Le modèle n'est pas encore recalé sur des vols. Les coefficients marqués « à recaler » et les incertitudes « a priori » seront ajustés avec des plafonds et des Vz relevés massif par massif.</div>
+  <div class="note">Premier recalage sur un vol réel (8 juillet 2026, dix pompes des Bauges à Belledonne) : voir la section « Recalage ». Les coefficients restent provisoires tant qu'un seul jour est disponible.</div>
 
   <h2><small>Vue d'ensemble</small>La chaîne de calcul</h2>
   <ol class="chain">
@@ -98,7 +98,7 @@
   <p>La convection part du pied des versants plutôt que du sommet : on prend comme base \(z_b = \min(z, \bar z)\), et l'épaisseur de la couche brassée est \(z_i = z_t - z_b\).</p>
   <p><b>Base des cumulus.</b> Une particule part du sol avec un excès de température \(\Delta T = 0{,}4 + 1{,}6\,\min(1, H/300)\) K et un rapport de mélange pris à 60 % en surface et à 40 % dans le premier tiers de la couche (mélange par les thermiques). Son niveau de condensation est</p>
   $$z_{\text{LCL}} \simeq z_b + 125\ \text{m/K}\times (T_p - T_d)$$
-  <p>S'il est sous le sommet de la convection, la journée est à cumulus et le plafond est la base ; sinon les thermiques sont bleus et le plafond utilisable est pris à 95 % de la couche.</p>
+  <p>S'il est sous le sommet de la convection, la journée est à cumulus et le plafond est la base ; sinon les thermiques sont bleus et le plafond utilisable est pris à 85 % de la couche (recalé sur les vols : au-delà, la vitesse de l'air ne compense plus la chute du planeur).</p>
 
   <h2><small>Étape 4</small>Les brises de pente</h2>
   <p>Un versant chauffé engendre une brise montante dont l'intensité croît avec le flux de chaleur et la pente. On la représente par le champ sans dimension</p>
@@ -119,8 +119,8 @@
   <p>On suit le modèle d'Allen (2006), tiré de mesures en plaine. À la hauteur relative \(\zeta = z/z_i\) :</p>
   $$\bar w = w_*\,\zeta^{1/3}(1-1{,}1\,\zeta), \qquad r_2 = 0{,}102\,\zeta^{1/3}(1-0{,}25\,\zeta)\,z_i$$
   $$w_{\text{cœur}} = 3\,\bar w\,\frac{1-q}{1-q^{3}}, \qquad q = \frac{r_1}{r_2} = 0{,}0011\,r_2 + 0{,}14$$
-  <p>\(\bar w\) est la vitesse moyenne dans le thermique, \(r_2\) son rayon extérieur. En montagne, la convergence des brises concentre et renforce le thermique ; on multiplie le cœur par \((1 + a\,c)\) et le rayon par \((1+\rho\,c)\), avec \(a = 1\) et \(\rho = 0{,}25\) (à recaler). Le profil radial est pris gaussien :</p>
-  $$w(r) = w_{\text{cœur}}\,(1+a\,c)\;\exp\!\Big[-\Big(\frac{r}{R}\Big)^2\Big], \qquad R = 0{,}75\,r_2\,(1+\rho\,c)$$
+  <p>\(\bar w\) est la vitesse moyenne dans le thermique, \(r_2\) son rayon extérieur. Ce profil décrit le thermique <i>moyen</i> en plaine. Le pilote, lui, exploite les meilleurs thermiques, accrochés au relief, plus forts et plus larges : le recalage sur les vols donne un facteur \(k_w = 2\) sur le cœur et \(k_r = 2\) sur le rayon. Ces facteurs valent 1 sous 700 m (vallées, collines, où le modèle de plaine reste valable) et croissent linéairement jusqu'à leur valeur pleine à 1 500 m. La convergence des brises ajoute \((1 + a\,c)\) sur le cœur et \((1+\rho\,c)\) sur le rayon, avec \(a = \rho = 0{,}25\). Le profil radial est pris gaussien :</p>
+  $$w(r) = k_w\,w_{\text{cœur}}\,(1+a\,c)\;\exp\!\Big[-\Big(\frac{r}{R}\Big)^2\Big], \qquad R = 0{,}75\,k_r\,r_2\,(1+\rho\,c)$$
   <h3>Le planeur en spirale</h3>
   <p>À 90 km/h (\(V = 25\) m/s) et 45° d'inclinaison, le rayon de virage est</p>
   $$r_v = \frac{V^2}{g\tan\varphi} = 63{,}7\ \text{m}$$
@@ -135,7 +135,7 @@
   <p>L'indice de déclenchement \(\;\mathcal{I} = V_z\,(0{,}3 + c)\,\big(0{,}6 + 0{,}4\min(1, F/F_0)\big)\;\) est lissé, puis on retient ses maxima locaux, d'abord les plus forts, en imposant 1,65 km entre deux pompes (300 au plus). Le point affiché est le point de départ au sol ; le trait montre la dérive jusqu'au plafond, durée de montée de l'air multipliée par le vent dans la couche.</p>
 
   <h2><small>Étape 7</small>Incertitudes à 95 % et probabilité</h2>
-  <p>Chaque pompe est recalculée 300 fois en tirant au hasard les erreurs des entrées. Les écarts types sont des estimations a priori, qui seront revues avec les observations :</p>
+  <p>Chaque pompe est recalculée 300 fois en tirant au hasard les erreurs des entrées. Les écarts types partent d'estimations a priori ; la force des thermiques, la base des cumulus et le point de déclenchement ont été élargis après comparaison aux vols :</p>
   <div class="tbl"><table>
     <thead><tr><th>Grandeur</th><th>Erreur tirée</th></tr></thead>
     <tbody>
@@ -143,10 +143,11 @@
       <tr><td>Épaisseur de la couche \(z_i\)</td><td>± 15 %</td></tr>
       <tr><td>Renforcement par la convergence</td><td>± 35 %</td></tr>
       <tr><td>Rayon du thermique</td><td>± 25 %</td></tr>
+      <tr><td>Force d'un thermique à l'autre, le même jour</td><td>± 15 %</td></tr>
       <tr><td>Chute du planeur en spirale</td><td>± 0,1 m/s</td></tr>
       <tr><td>Vent dans la couche</td><td>± 30 % et ± 0,8 m/s ; direction ± 20°</td></tr>
-      <tr><td>Base des cumulus</td><td>± 190 m (± 1,5 K sur \(T_p - T_d\))</td></tr>
-      <tr><td>Point de déclenchement</td><td>étendue de la zone favorable (mailles à plus de 70 % du maximum dans un rayon de 1,2 km) + 250 m</td></tr>
+      <tr><td>Base des cumulus</td><td>± 250 m (± 2 K sur \(T_p - T_d\))</td></tr>
+      <tr><td>Point de déclenchement</td><td>étendue de la zone favorable (mailles à plus de 70 % du maximum dans un rayon de 1,2 km) + 400 m</td></tr>
     </tbody>
   </table></div>
   <p><b>Fourchettes.</b> Les bornes affichées pour la Vz et le plafond sont les quantiles 2,5 % et 97,5 % des 300 tirages.</p>
@@ -161,12 +162,25 @@
   </ul>
   <div class="note">\(P_{\text{site}}\) est une hypothèse de travail, pas une fréquence mesurée. Une probabilité annoncée de 70 % ne sera « vraie » qu'après recalage : sur l'ensemble des pompes annoncées à 70 %, environ 7 sur 10 devront avoir été trouvées. C'est ce que permettront vos relevés (diagramme de fiabilité, score de Brier).</div>
 
-  <h2><small>Recalage</small>Ce que les observations permettront d'ajuster</h2>
-  <ul>
-    <li>Plafonds relevés par massif : le biais sur le sommet de la convection et la base des cumulus, et l'écart type de \(z_i\).</li>
-    <li>Vz relevées dans des pompes connues : les coefficients \(a\) et \(\rho\) du renforcement en montagne, et l'écart type correspondant.</li>
-    <li>Pompes trouvées ou absentes : la loi \(P_{\text{site}}\), puis la vérification que les ellipses contiennent bien 95 % des thermiques.</li>
-  </ul>
+  <h2><small>Recalage</small>Premier recalage : vol du 8 juillet 2026</h2>
+  <p>Circuit Pointe Percée – Chamrousse – Semnoz depuis Challes, 14 h 38 – 18 h 24. Dix pompes relevées (Vz au vario et plafond), heure estimée par la distance parcourue. Le modèle est pris dans un rayon de 1 km autour de chaque pompe, interpolé entre les deux heures qui l'encadrent. Les deux pompes basses du Mont Saint-Michel, prises depuis la plaine en début de vol, servent seulement à fixer l'altitude en dessous de laquelle les thermiques ne sont pas renforcés.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Pompe</th><th>Relevé Vz / plafond</th><th>Modèle avant</th><th>Modèle recalé</th></tr></thead>
+    <tbody>
+      <tr><td>Mont Saint-Michel (Grand Joueret, chapelle), 14 h 45 – 14 h 55</td><td>1,5 / 1 300 – 1 430</td><td>1,6 / 2 870</td><td>1,4 / 2 620</td></tr>
+      <tr><td>Pic de la Sauge, 15 h 05</td><td>3 / 3 100</td><td>1,9 / 3 250</td><td>3,5 / 3 040</td></tr>
+      <tr><td>Dent d'Arclusaz, 15 h 10</td><td>3 / 3 250</td><td>2,7 / 3 660</td><td>4,0 / 3 420</td></tr>
+      <tr><td>Mont Charvin, 15 h 35</td><td>3,5 / 3 600</td><td>2,7 / 4 030</td><td>4,0 / 3 790</td></tr>
+      <tr><td>Col de Balme (La Clusaz), 15 h 40</td><td>3 / 3 500</td><td>1,3 / 4 380</td><td>3,2 / 4 380</td></tr>
+      <tr><td>Pointe de la Blonnière, 16 h</td><td>2,5 / 3 750</td><td>1,8 / 4 180</td><td>3,3 / 3 950</td></tr>
+      <tr><td>La Tuile (Grand Arc), 16 h 20</td><td>5 / 3 900</td><td>1,4 / 3 880</td><td>3,1 / 3 670</td></tr>
+      <tr><td>Cime de la Jasse (7 Laux), 16 h 55</td><td>3,5 / 3 400</td><td>1,0 / 3 700</td><td>2,7 / 3 510</td></tr>
+      <tr><td>Margériaz sud, 17 h 45</td><td>3,5 / 3 200</td><td>0,2 / 2 770</td><td>1,5 / 2 630</td></tr>
+    </tbody>
+  </table></div>
+  <p>Sur les 8 pompes de relief : Vz, biais −1,75 → −0,2 m/s, écart quadratique 2,1 → 1,2 m/s ; plafond, biais +270 → +85 m, écart quadratique 450 → 400 m. Les Vz relevées ne suivent pas l'indice de convergence \(c\) (3,5 m/s au Margériaz avec \(c\approx0{,}2\), 3 m/s à l'Arclusaz avec \(c\approx1{,}1\)) : le renforcement passe donc d'un terme proportionnel à \(c\) (\(a = 1\)) à un facteur commun (\(k_w = 2\), \(a = 0{,}25\)). Avec les écarts types élargis, 7 Vz sur 8 et 7 plafonds sur 8 tombent dans les fourchettes à 95 % ; 5 pompes sur 8 tombent dans l'ellipse de la pompe annoncée la plus proche.</p>
+  <p>Défauts restants : la Vz baisse trop vite en fin d'après-midi (Jasse, Margériaz) ; le plafond suit trop le relief (trop haut dans les Aravis, trop bas au Margériaz) ; au Mont Saint-Michel, la Vz est juste mais le plafond relevé (1 300 – 1 430 m) est très en dessous du modèle (2 600 m), peut-être parce que le pilote a quitté ces pompes pour rejoindre le relief.</p>
+  <div class="note">Un seul jour de vol : ces coefficients sont provisoires. Chaque nouveau vol (pompes trouvées, et aussi pompes cherchées sans succès) affinera les facteurs, les écarts types et la loi \(P_{\text{site}}\) (diagramme de fiabilité, score de Brier).</div>
 
   <h2><small>Limites</small>Ce que le modèle ne fait pas</h2>
   <ul>

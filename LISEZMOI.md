@@ -25,6 +25,6 @@ puis ouvrir http://localhost:8124.
 
 ## Recalage
 
-Les paramètres à recaler sur des vols sont regroupés dans `PARAM` (`js/model.js`) et dans la fonction `uncertainty` (écarts types a priori).
+Les paramètres recalés sur des vols sont regroupés dans `PARAM` (`js/model.js`) et dans la fonction `uncertainty` (écarts types). Premier recalage : vol du 8/07/2026 (`wFac`, `rFac`, `amp`, `ceilFrac`, écarts types de force, de base et de déclenchement). Le banc d'essai `calib/` (non publié, servi en local) compare le modèle aux relevés.
 
 Modèle expérimental : ordres de grandeur, pas une garantie.

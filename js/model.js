@@ -25,12 +25,17 @@ const GFRAC = [0, 0.60, 0.08, 0.12, 0.12, 0.25, 0];
 
 // Paramètres du thermique et du planeur. Les deux premiers seront recalés sur les observations.
 export const PARAM = {
-  amp: 1.0,                 // renforcement du noyau par la convergence : x (1 + amp · indice)
+  amp: 0.25,                // renforcement du noyau par la convergence : x (1 + amp · indice)
   rad: 0.25,                // élargissement du thermique par la convergence : x (1 + rad · indice)
   bankDeg: 45, vKmh: 90,    // spirale du planeur
   polarA: 2.38e-5, polarB: 8.02,   // polaire d'un planeur de classe standard : chute = a V³ + b n²/V
   heights: [0.3, 0.5, 0.7], // hauteurs relatives dans la couche convective où l'on spirale
   vzMin: 0.5, gainMin: 300, // « exploitable » : Vz d'au moins 0,5 m/s et 300 m de gain possible
+  // Recalage sur les relevés du 8/07/2026 (8 pompes, Bauges, Aravis, Grand Arc, Belledonne) :
+  wFac: 2.0, rFac: 2.0,     // thermiques exploités = les plus forts et les plus larges, accrochés au relief
+  reliefZ: [700, 1500],     // ces facteurs passent de 1 (vallées, collines) à leur valeur (montagne) entre ces altitudes
+  topSlope: 1.1,            // part maximale du relief que suit le sommet de la couche convective
+  ceilFrac: 0.85,           // plafond sans cumulus : fraction de la couche convective (avant : 0,95)
 };
 const V = PARAM.vKmh / 3.6, BANK = PARAM.bankDeg * Math.PI / 180;
 export const R_TURN = V * V / (9.81 * Math.tan(BANK));                                 // 63,7 m
@@ -211,7 +216,7 @@ function pointState(T, W, idx) {
     }
     S.rr.push(interpProfile(zr, rs));
   }
-  S.fTop = fitZ(S.elev, S.blh.map((h, k) => S.elev[k] + h), 0.0, 1.1);     // sommet de la couche convective (m)
+  S.fTop = fitZ(S.elev, S.blh.map((h, k) => S.elev[k] + h), 0.0, PARAM.topSlope);     // sommet de la couche convective (m)
   S.fTh = fitZ(S.elev, th2, -0.002, 0.006);                                 // température potentielle à 2 m (K)
   S.fR = fitZ(S.elev, r2, -1e-5, 1e-5);                                     // rapport de mélange à 2 m
   // neige : au-dessus de la plus basse maille enneigée, et seulement dans les secteurs où il y en a
@@ -277,6 +282,12 @@ function shadows(T, sunEl, sunAz, out) {
   }
 }
 
+/** Facteurs [cœur, rayon] des thermiques de montagne à l'altitude z. */
+export function reliefGain(z) {
+  const [z0, z1] = PARAM.reliefZ, g = Math.min(1, Math.max(0, (z - z0) / (z1 - z0)));
+  return [1 + (PARAM.wFac - 1) * g, 1 + (PARAM.rFac - 1) * g];
+}
+
 /**
  * Vz au vario d'un planeur spiralant dans un thermique, moyennée sur les hauteurs PARAM.heights.
  * Profil d'Allen (2006) : vitesse moyenne w̄ = w*(z/zi)^(1/3)(1 - 1,1 z/zi), rayon r2 = 0,102 (z/zi)^(1/3)(1 - 0,25 z/zi) zi,
@@ -314,9 +325,10 @@ function rng(seed) {
 /**
  * Incertitudes d'une pompe par tirage aléatoire des erreurs du modèle (N tirages).
  * s : { z, zb, zi, H, c, cu, zl, wu, wv, fw, cov:[xx, xy, yy] (m²) }
- * Écarts types retenus (a priori, à recaler) : H ±25 %, épaisseur de couche ±15 %, renforcement ±35 %,
- * rayon ±25 %, chute du planeur ±0,1 m/s, vent ±30 % et ±0,8 m/s, direction ±20°, base des cumulus ±190 m,
- * point de déclenchement : étendue de la zone favorable + 250 m.
+ * Écarts types retenus : H ±25 %, épaisseur de couche ±15 %, renforcement ±35 %, rayon ±25 %,
+ * force d'un thermique à l'autre ±15 %, chute du planeur ±0,1 m/s, vent ±30 % et ±0,8 m/s, direction ±20°,
+ * base des cumulus ±250 m, point de déclenchement : étendue de la zone favorable + 400 m.
+ * (Force, base et déclenchement élargis après comparaison aux relevés du 8/07/2026.)
  */
 export function uncertainty(s, seed, N = 300) {
   const n = rng(seed);
@@ -327,18 +339,20 @@ export function uncertainty(s, seed, N = 300) {
   let ok = 0;
   for (let k = 0; k < N; k++) {
     const fH = Math.exp(0.25 * n()), fZ = Math.exp(0.15 * n()), fa = Math.exp(0.35 * n()), fr = Math.exp(0.25 * n()), sink = SINK + 0.1 * n();
+    const fs = Math.exp(0.15 * n());                     // d'un thermique à l'autre, le même jour (relevés du 8/07)
     const zi = s.zi * fZ, wst = Math.cbrt(9.81 / 300 * s.H * fH / 1105 * zi);
-    const [v, a, c0] = thermal(wst, zi, s.c, fa, fr, sink, s.fw);
+    const [kw, kr] = reliefGain(s.z);
+    const [v, a, c0] = thermal(wst, zi, s.c, fa, fr * kr, sink, s.fw * fs * kw);
     const top = s.zb + zi;
-    const ceil = Math.max(s.z, s.cu ? Math.min(s.zl + 190 * n(), top) : s.zb + 0.95 * zi);
+    const ceil = Math.max(s.z, s.cu ? Math.min(s.zl + 250 * n(), top) : s.zb + PARAM.ceilFrac * zi);
     vz[k] = v; ce[k] = ceil; air[k] = a; core[k] = c0;
     if (v >= PARAM.vzMin && ceil - s.z >= PARAM.gainMin) ok++;
     // position du thermique à mi-hauteur de la bande exploitable
     const U = Math.max(0, U0 * Math.exp(0.3 * n()) + 0.8 * n()), th = th0 + 0.35 * n();
     const t = 0.5 * Math.max(0, ceil - s.z) / Math.max(0.7, a);
     const n1 = n(), n2 = n();
-    xs[k] = l11 * n1 + 250 * n() + U * Math.sin(th) * t;
-    ys[k] = l21 * n1 + l22 * n2 + 250 * n() + U * Math.cos(th) * t;
+    xs[k] = l11 * n1 + 400 * n() + U * Math.sin(th) * t;
+    ys[k] = l21 * n1 + l22 * n2 + 400 * n() + U * Math.cos(th) * t;
   }
   const q = (arr, f) => { const b = Array.from(arr).sort((x, y) => x - y); return b[Math.min(N - 1, Math.floor(f * N))]; };
   let mx = 0, my = 0;
@@ -458,14 +472,15 @@ export function computeHour(T, W, idx) {
     zlA[p] = zl;
     const isCu = zl < zt - 80;
     cu[p] = isCu ? 1 : 0;
-    ceil[p] = Math.max(z, isCu ? zl : zb + 0.95 * zi);
+    ceil[p] = Math.max(z, isCu ? zl : zb + PARAM.ceilFrac * zi);
     const [wu, wv] = windAt(T, S, p), wind = Math.hypot(wu, wv);
     let fw = 1;
     if (wind > 9) fw *= Math.max(0.6, 1 - (wind - 9) / 15);           // thermiques hachés par vent fort
     if (L4(S.rain, p) > 0.3) fw *= 0.35;                               // averses
     fwA[p] = fw;
     const wstar = Math.cbrt(9.81 / 300 * Hreg[p] / 1105 * zi);
-    climb[p] = Math.max(0, thermal(wstar, zi, cidx[p], 1, 1, SINK, fw)[0]);
+    const [kw, kr] = reliefGain(z);
+    climb[p] = Math.max(0, thermal(wstar, zi, cidx[p], 1, kr, SINK, fw * kw)[0]);
     if (ceil[p] < z + 150) climb[p] = 0;                               // rien d'exploitable sous 150 m de gain
   }
 
