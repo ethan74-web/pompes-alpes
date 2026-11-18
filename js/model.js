@@ -20,12 +20,13 @@ import { LEVELS, NG, utcMillis } from "./weather.js";
 const NZ = 61, DZ = 100;                       // profils verticaux : 0 à 6000 m tous les 100 m
 const KAPPA = 0.2857;
 const G_RCP = 9.81 / (300 * 1105);             // g / (θ ρ cp) : flux de chaleur (W) -> flux de flottabilité (m⁴/s³)
-// nature du sol : 0 hors données, 1 lac, 2 forêt, 3 fond de vallée, 4 alpage, 5 rocher, 6 glacier
-const ALBEDO = [0, 0.07, 0.13, 0.20, 0.20, 0.25, 0.55];
-const BOWEN = [0, 0.05, 0.70, 0.80, 1.20, 5.00, 0];
-const GFRAC = [0, 0.60, 0.08, 0.12, 0.12, 0.25, 0];
-// mémoire de chaleur l'après-midi (part de la baisse horaire compensée) : la roche stocke et restitue le plus
-const MEM = [0, 0, 0.25, 0.3, 0.35, 0.55, 0];
+// nature du sol (ESA WorldCover 2021, type dominant par maille de 150 m) :
+// 0 hors données, 1 lac, 2 forêt, 3 fond de vallée et cultures, 4 alpage et landes, 5 rocher et éboulis, 6 glacier, 7 bâti
+const ALBEDO = [0, 0.07, 0.13, 0.20, 0.20, 0.25, 0.55, 0.15];
+const BOWEN = [0, 0.05, 0.70, 0.80, 1.20, 5.00, 0, 3.0];
+const GFRAC = [0, 0.60, 0.08, 0.12, 0.12, 0.25, 0, 0.30];
+// mémoire de chaleur l'après-midi (part de la baisse horaire compensée) : la roche et le bâti stockent et restituent le plus
+const MEM = [0, 0, 0.25, 0.3, 0.35, 0.55, 0, 0.5];
 // voisins (D8) : est, nord-est, nord, nord-ouest, ouest, sud-ouest, sud, sud-est (j croît vers le sud)
 const DI = [1, 1, 0, -1, -1, -1, 0, 1], DJ = [0, -1, -1, -1, 0, 1, 1, 1];
 
@@ -674,7 +675,7 @@ function surfaceHeat(T, W, S, idx) {
     const sg = dni * cosi * lit[p] + dif * svf[p] + 0.2 * ghi * (1 - svf[p]);
     const rn = (1 - alb) * sg - (95 - 55 * L4(S.cloudLow, p) / 100);
     let bo = BOWEN[c];
-    if (c !== 5) { const sm = L4(S.soil, p); if (sm === sm) bo *= 1.5 - 0.9 * Math.min(1, Math.max(0, (sm - 0.10) / 0.25)); }
+    if (c !== 5 && c !== 7) { const sm = L4(S.soil, p); if (sm === sm) bo *= 1.5 - 0.9 * Math.min(1, Math.max(0, (sm - 0.10) / 0.25)); }
     if (snowy) bo = 0.15;
     const h = (1 - GFRAC[c]) * rn * bo / (1 + bo);
     H[p] = h > 0 ? h : 0;

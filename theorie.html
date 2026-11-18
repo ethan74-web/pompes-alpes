@@ -83,6 +83,7 @@
   $$R_n = (1-\alpha)\,S - L^{*}, \qquad L^{*} = 95 - 55\,\frac{c_{\text{bas}}}{100}\ \text{W/m}^2$$
   <p>où \(L^{*}\) est la perte nette en grandes longueurs d'onde, réduite par les nuages bas \(c_{\text{bas}}\) (en %). Il se partage entre le flux dans le sol \(G_s = g\,R_n\), le flux de chaleur sensible \(H\) et la chaleur latente d'évaporation \(LE\). Le rapport de Bowen \(\beta = H/LE\) fixe le partage :</p>
   $$H = (1-g)\,R_n\,\frac{\beta}{1+\beta}$$
+  <p>La nature du sol vient de la carte ESA WorldCover 2021 (pixels de 10 m, satellites Sentinel) : chaque maille de 150 m compte ses pixels par classe et prend le type dominant. Les prairies sous 900 m sont comptées en fond de vallée (prés humides, cultures), au-dessus en alpage ; un lac exige au moins la moitié d'eau. Avant novembre 2026, la nature du sol était devinée d'après l'altitude et la pente.</p>
   <div class="tbl"><table>
     <thead><tr><th>Sol</th><th>Albédo \(\alpha\)</th><th>Bowen \(\beta\)</th><th>Part dans le sol \(g\)</th></tr></thead>
     <tbody>
@@ -90,6 +91,7 @@
       <tr><td>Fond de vallée, cultures</td><td class="n">0,20</td><td class="n">0,8</td><td class="n">0,12</td></tr>
       <tr><td>Alpage</td><td class="n">0,20</td><td class="n">1,2</td><td class="n">0,12</td></tr>
       <tr><td>Rocher, éboulis</td><td class="n">0,25</td><td class="n">5</td><td class="n">0,25</td></tr>
+      <tr><td>Bâti (villes, zones d'activité)</td><td class="n">0,15</td><td class="n">3</td><td class="n">0,30</td></tr>
       <tr><td>Neige</td><td class="n">0,60</td><td class="n">0,15</td><td class="n">—</td></tr>
       <tr><td>Lac, glacier</td><td colspan="3">pas de flux vers le haut (l'air est plus chaud que la surface)</td></tr>
     </tbody>
