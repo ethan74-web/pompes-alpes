@@ -24,6 +24,8 @@ const G_RCP = 9.81 / (300 * 1105);             // g / (θ ρ cp) : flux de chale
 const ALBEDO = [0, 0.07, 0.13, 0.20, 0.20, 0.25, 0.55];
 const BOWEN = [0, 0.05, 0.70, 0.80, 1.20, 5.00, 0];
 const GFRAC = [0, 0.60, 0.08, 0.12, 0.12, 0.25, 0];
+// mémoire de chaleur l'après-midi (part de la baisse horaire compensée) : la roche stocke et restitue le plus
+const MEM = [0, 0, 0.25, 0.3, 0.35, 0.55, 0];
 // voisins (D8) : est, nord-est, nord, nord-ouest, ouest, sud-ouest, sud, sud-est (j croît vers le sud)
 const DI = [1, 1, 0, -1, -1, -1, 0, 1], DJ = [0, -1, -1, -1, 0, 1, 1, 1];
 
@@ -46,7 +48,8 @@ export const PARAM = {
   feedLen: 2500,            // distance sur laquelle la brise perd la moitié de sa chaleur (m, e-folding)
   feedMax: 3000,            // longueur maximale d'un trajet d'alimentation (m)
   maxSpots: 800,          // pompes retenues au plus (les plus fortes), sur toute la zone
-  lagMin: 30,               // retard (min) entre la position du soleil et le flux de chaleur
+  memory: 1,                // échelle de la mémoire de chaleur de l'après-midi (0 : sans)
+  lagMin: 30,             // retard (min) entre la position du soleil et le flux de chaleur
   shelterDeg: [2, 14],      // abri : vent plein si le relief au vent est vu sous moins de 2°, réduit au minimum au-delà de 14°
   shelterMin: 0.1,          // part du vent qui atteint encore un versant abrité (décollement sous la crête)
   entL: 2000,               // entraînement : la particule perd son excès de chaleur sur cette distance (m)
@@ -647,57 +650,73 @@ function parcelTop(T, S, p, zb, thP, rP, zLid = 0, dLid = 0) {
   return (NZ - 1) * DZ;
 }
 
+/** Éclairement de chaque pente (soleil direct, ombres, diffus) et flux de chaleur sensible H (W/m²) à l'heure idx. */
+function surfaceHeat(T, W, S, idx) {
+  const { meta, n, elev, normal, cover, svf } = T;
+  const { nx, ny } = meta;
+  // soleil un peu avant l'heure affichée : milieu de l'heure écoulée, plus le retard du sol qui restitue sa chaleur
+  const sun = sunPosition(utcMillis(W, idx) - PARAM.lagMin * 60e3, meta.lat0, meta.lon0);
+  const el = sun.el * Math.PI / 180, az = sun.az * Math.PI / 180;
+  const sx = Math.cos(el) * Math.sin(az), sy = Math.cos(el) * Math.cos(az), sz = Math.sin(el);
+  const L4 = (arr, p) => lerp4(T, arr, p);
+  const H = new Float32Array(n);
+  if (sun.el <= 1) return { H, sun };
+
+  const lit = new Float32Array(n);
+  shadows(T, sun.el, sun.az, lit);
+  for (let p = 0; p < n; p++) {
+    const c = cover[p];
+    if (c === 0 || c === 1 || c === 6) continue;          // hors données, lacs, glaciers (air plus chaud que la glace)
+    const cosi = Math.max(0, (normal[p * 3] * sx + normal[p * 3 + 1] * sy + normal[p * 3 + 2] * sz) / 127);
+    const dni = L4(S.dni, p), dif = L4(S.dif, p), ghi = L4(S.ghi, p);
+    const snowy = elev[p] > S.snowLine && L4(S.snowAny, p) > 0.15;
+    const alb = snowy ? 0.6 : ALBEDO[c];
+    const sg = dni * cosi * lit[p] + dif * svf[p] + 0.2 * ghi * (1 - svf[p]);
+    const rn = (1 - alb) * sg - (95 - 55 * L4(S.cloudLow, p) / 100);
+    let bo = BOWEN[c];
+    if (c !== 5) { const sm = L4(S.soil, p); if (sm === sm) bo *= 1.5 - 0.9 * Math.min(1, Math.max(0, (sm - 0.10) / 0.25)); }
+    if (snowy) bo = 0.15;
+    const h = (1 - GFRAC[c]) * rn * bo / (1 + bo);
+    H[p] = h > 0 ? h : 0;
+  }
+  // recalage sur le flux de chaleur moyen du modèle météo, quand il le fournit
+  const half = Math.round(nx / NG / 2);
+  let mine = 0, api = 0, cnt = 0;
+  for (let k = 0; k < S.K; k++) {
+    if (!(S.hApi[k] === S.hApi[k])) continue;
+    const ci = Math.round((W.pts[k].gx + 0.5) / NG * nx), cj = Math.round((W.pts[k].gy + 0.5) / NG * ny);
+    let s = 0, m = 0;
+    for (let j = Math.max(0, cj - half); j < Math.min(ny, cj + half); j += 4) for (let i = Math.max(0, ci - half); i < Math.min(nx, ci + half); i += 4) {
+      const p = j * nx + i; if (cover[p]) { s += H[p]; m++; }
+    }
+    if (m < 20) continue;
+    mine += s / m; api += Math.max(0, S.hApi[k]); cnt++;
+  }
+  if (cnt > 0 && mine / cnt > 15) {
+    const k = Math.min(1.6, Math.max(0.4, api / mine));
+    for (let p = 0; p < n; p++) H[p] *= k;
+  }
+  return { H, sun };
+}
+
 /** Calcule tous les champs pour l'heure d'indice idx. */
 export function computeHour(T, W, idx) {
   const { meta, n, elev, normal, cover, slope, svf, zs } = T;
   const { nx, ny, dx } = meta;
   const S = pointState(T, W, idx);
-  // soleil un peu avant l'heure affichée : milieu de l'heure écoulée, plus le retard du sol qui restitue sa chaleur
   const sun = sunPosition(utcMillis(W, idx) - PARAM.lagMin * 60e3, meta.lat0, meta.lon0);
-  const el = sun.el * Math.PI / 180, az = sun.az * Math.PI / 180;
-  const sx = Math.cos(el) * Math.sin(az), sy = Math.cos(el) * Math.cos(az), sz = Math.sin(el);
   const day = sun.el > 1;
   const L4 = (arr, p) => lerp4(T, arr, p);
   const ms = {}, t0 = performance.now(); let tl = t0;
   const lap = k => { const t = performance.now(); ms[k] = Math.round(t - tl); tl = t; };
 
   // ---- 1 et 2 : éclairement de la pente et flux de chaleur sensible
-  const H = new Float32Array(n);
-  if (day) {
-    const lit = new Float32Array(n);
-    shadows(T, sun.el, sun.az, lit);
-    for (let p = 0; p < n; p++) {
-      const c = cover[p];
-      if (c === 0 || c === 1 || c === 6) continue;          // hors données, lacs, glaciers (air plus chaud que la glace)
-      const cosi = Math.max(0, (normal[p * 3] * sx + normal[p * 3 + 1] * sy + normal[p * 3 + 2] * sz) / 127);
-      const dni = L4(S.dni, p), dif = L4(S.dif, p), ghi = L4(S.ghi, p);
-      const snowy = elev[p] > S.snowLine && L4(S.snowAny, p) > 0.15;
-      const alb = snowy ? 0.6 : ALBEDO[c];
-      const sg = dni * cosi * lit[p] + dif * svf[p] + 0.2 * ghi * (1 - svf[p]);
-      const rn = (1 - alb) * sg - (95 - 55 * L4(S.cloudLow, p) / 100);
-      let bo = BOWEN[c];
-      if (c !== 5) { const sm = L4(S.soil, p); if (sm === sm) bo *= 1.5 - 0.9 * Math.min(1, Math.max(0, (sm - 0.10) / 0.25)); }
-      if (snowy) bo = 0.15;
-      const h = (1 - GFRAC[c]) * rn * bo / (1 + bo);
-      H[p] = h > 0 ? h : 0;
-    }
-    // recalage sur le flux de chaleur moyen du modèle météo, quand il le fournit
-    const half = Math.round(nx / NG / 2);
-    let mine = 0, api = 0, cnt = 0;
-    for (let k = 0; k < S.K; k++) {
-      if (!(S.hApi[k] === S.hApi[k])) continue;
-      const ci = Math.round((W.pts[k].gx + 0.5) / NG * nx), cj = Math.round((W.pts[k].gy + 0.5) / NG * ny);
-      let s = 0, m = 0;
-      for (let j = Math.max(0, cj - half); j < Math.min(ny, cj + half); j += 4) for (let i = Math.max(0, ci - half); i < Math.min(nx, ci + half); i += 4) {
-        const p = j * nx + i; if (cover[p]) { s += H[p]; m++; }
-      }
-      if (m < 20) continue;
-      mine += s / m; api += Math.max(0, S.hApi[k]); cnt++;
-    }
-    if (cnt > 0 && mine / cnt > 15) {
-      const k = Math.min(1.6, Math.max(0.4, api / mine));
-      for (let p = 0; p < n; p++) H[p] *= k;
-    }
+  const { H } = surfaceHeat(T, W, S, idx);
+  // Mémoire de chaleur : l'après-midi, quand le chauffage baisse, la roche et l'air chaud près des pentes continuent
+  // de nourrir les thermiques. On garde une part MEM de la baisse depuis l'heure précédente (le matin, rien ne change).
+  if (day && sun.az > 180 && idx > 0) {
+    const H1 = surfaceHeat(T, W, pointState(T, W, idx - 1), idx - 1).H;
+    for (let p = 0; p < n; p++) if (H1[p] > H[p]) H[p] += PARAM.memory * MEM[cover[p]] * (H1[p] - H[p]);
   }
   const Hreg = blur(H, nx, ny, Math.round(450 / dx), 2);    // moyenne sur ~1 km : ce que « voit » un thermique
   lap("chaleur");
@@ -825,7 +844,7 @@ export function computeHour(T, W, idx) {
     const pfeed = 0.2 + 0.7 * Math.min(1, ci) * (0.3 + 0.7 * prom);
     const psite = pfeed + Math.max(0, 0.92 - pfeed) * PARAM.trigW * trig;
     const prob = Math.min(0.95, Math.max(0.02, u.pdev * psite));
-    return { i: c.i, j: c.j, score: c.s, elev: z, cu: cu[p], conv: ci, convAlone: cidx[p], shared: SH.shared[k], qs: Qs, h: Hreg[p], wu, wv, prob, psite, trig, lid: T.lidF[p], ...u };
+    return { i: c.i, j: c.j, score: c.s, elev: z, cu: cu[p], depth: cu[p] ? Math.max(0, top[p] - zlA[p]) : 0, conv: ci, convAlone: cidx[p], shared: SH.shared[k], qs: Qs, h: Hreg[p], wu, wv, prob, psite, trig, lid: T.lidF[p], ...u };
   });
 
   relativeProb(out, dx);
@@ -854,8 +873,11 @@ export function computeHour(T, W, idx) {
     hMean: nv ? hm / nv : 0,
     snowLine: S.snowLine, ms,
     fields: fieldSummary(T, S, out),
+    over: overDev(out, S),
+    wave: waveDiag(S),
   };
-  return { H: Hreg, Hloc, top, ceil, cu, climb, conv: cidx, Q, zl: zlA, fw: fwA, ua, va, flow: fl, spots: out, stats, S };
+  const wave = stats.wave.idx > 0.25 ? waveField(T, stats.wave) : null;
+  return { H: Hreg, Hloc, top, ceil, cu, climb, conv: cidx, Q, zl: zlA, fw: fwA, ua, va, flow: fl, spots: out, stats, S, wave };
 }
 
 /**
@@ -895,6 +917,66 @@ function fieldSummary(T, S, spots) {
       w10: [lerp4(T, S.u10, p), lerp4(T, S.v10, p)], w15: [prof4(T, S.uu, p, 15), prof4(T, S.vv, p, 15)] };
   });
 }
+
+/**
+ * Surdéveloppement : épaisseur des cumulus (sommet des thermiques − base) parmi les pompes sûres à cumulus, et CAPE.
+ * Niveau 0 : rien ; 1 : cumulus épais, étalements ou surdéveloppements possibles ; 2 : congestus, averses ou orages probables.
+ */
+function overDev(spots, S) {
+  const d = spots.filter(s => s.cu && s.prob >= 0.5).map(s => s.depth).sort((a, b) => a - b);
+  const depth = d.length >= 5 ? d[Math.floor(d.length * 0.75)] : 0, cape = Math.max(0, ...S.cape.filter(x => x === x));
+  const level = depth > 3500 || cape > 1200 ? 2 : depth > 2200 || cape > 600 ? 1 : 0;
+  return { level, depth, cape, frac: spots.length ? d.length / spots.length : 0 };
+}
+
+/**
+ * Onde de relief (théorie linéaire). Profil moyen du domaine : fréquence de Brunt-Väisälä N² = (g/θ) dθ/dz et vent U
+ * dans la couche des crêtes (2 500 – 3 500 m) et au-dessus (4 000 – 5 500 m). Nombre de Froude Fr = U/(N h), h = 1 500 m ;
+ * paramètre de Scorer l² = N²/U² : des ondes piégées (en série sous le vent) quand il décroît avec l'altitude ;
+ * longueur d'onde λ = 2π U/N. Indice entre 0 et 1, à prendre comme une alerte, pas une prévision de la position des ondes.
+ * Foehn du sud : vent du sud fort au niveau des crêtes, air stable.
+ */
+function waveDiag(S) {
+  const K = S.K, at = (prof, l) => { let s = 0; for (let k = 0; k < K; k++) s += prof[k][l]; return s / K; };
+  const th = l => at(S.th, l), u = l => at(S.uu, l), v = l => at(S.vv, l), U = l => Math.hypot(u(l), v(l));
+  const N2 = (l1, l2) => 9.81 / th((l1 + l2) >> 1) * (th(l2) - th(l1)) / ((l2 - l1) * DZ);
+  const nLow = Math.sqrt(Math.max(1e-8, N2(25, 35))), nUp = Math.sqrt(Math.max(1e-8, N2(40, 55)));
+  const uLow = (U(25) + U(30) + U(35)) / 3, uUp = (U(45) + U(50) + U(55)) / 3;
+  const dir = (Math.atan2(-u(30), -v(30)) * 180 / Math.PI + 360) % 360;
+  const fr = uLow / (nLow * 1500), lam = 2 * Math.PI * uLow / nLow;
+  const trapped = nLow * nLow / (uLow * uLow + 1) > 1.3 * nUp * nUp / (uUp * uUp + 1);
+  // crêtes des Préalpes orientées vers le nord-nord-est (vent d'ouest ou d'est le plus efficace), chaîne principale et
+  // Belledonne vers le nord-est (vent de nord-ouest ou de sud-est) : on garde la plus favorable des deux
+  const perp = Math.max(0.3, Math.abs(Math.cos((dir - 290) * Math.PI / 180)), Math.abs(Math.cos((dir - 315) * Math.PI / 180)));
+  const idx = clip01((uLow - 8) / 7) * clip01((nLow - 0.004) / 0.006) * Math.exp(-((Math.log(Math.max(0.05, fr) / 0.8) / 0.9) ** 2)) * (trapped ? 1 : 0.6) * perp;
+  const foehn = dir >= 150 && dir <= 240 && uLow >= 12 && nLow > 0.005;
+  return { idx, lambda: lam, u: uLow, uUp, n: nLow, fr, dir, trapped, foehn };
+}
+
+/** Zones où chercher l'onde : à λ/2 et 3λ/2 sous le vent des crêtes exposées (indice 0 – 255 par maille). */
+function waveField(T, D) {
+  const { nx, ny, dx } = T.meta, n = T.n, out = new Uint8Array(n);
+  const from = D.dir * Math.PI / 180, ex = -Math.sin(from), ey = Math.cos(from);       // vers l'aval, i vers l'est, j vers le sud
+  const d16 = ((Math.round(from / (Math.PI / 8)) % 16) + 16) % 16;
+  const steps = [0.5, 1.5].map(f => Math.round(f * D.lambda / dx)), w = Math.max(2, Math.round(0.12 * D.lambda / dx));
+  for (let j = 0; j < ny; j += 2) for (let i = 0; i < nx; i += 2) {
+    const p = j * nx + i;
+    if (T.elev[p] < 1400 || T.curv[p] < 0.2 || T.shelter[p * 16 + d16] > 2) continue;       // crête exposée au vent
+    steps.forEach((s, k) => {
+      const ci = Math.round(i + ex * s), cj = Math.round(j + ey * s), amp = (k ? 140 : 255) * D.idx;
+      for (let dj = -w; dj <= w; dj++) for (let di = -w; di <= w; di++) {
+        const ii = ci + di, jj = cj + dj;
+        if (ii < 0 || jj < 0 || ii >= nx || jj >= ny) continue;
+        const q = jj * nx + ii, a = amp * Math.exp(-(di * di + dj * dj) / (w * w / 2));
+        if (a > out[q]) out[q] = a;
+      }
+    });
+  }
+  return out;
+}
+
+/** Diagnostic d'onde seul (sans calcul de la carte), pour l'aperçu des jours et les tests. */
+export function waveAt(T, W, idx) { return waveDiag(pointState(T, W, idx)); }
 
 function meanWind(S, l) {
   let u = 0, v = 0;

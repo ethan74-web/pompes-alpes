@@ -537,7 +537,7 @@ function drawLegend() {
   const sc = SCALES[st.layer], t = sc.ticks;
   const stops = [];
   for (let k = 0; k <= 20; k++) { const v = t[0] + (t[t.length - 1] - t[0]) * k / 20; stops.push(`${css(sc.col(v))} ${k * 5}%`); }
-  const fmt = v => st.layer === "climb" || st.layer === "conv" ? fr(v, v % 1 ? (v * 4 % 1 ? 2 : 1) : 0) : String(v);
+  const fmt = v => st.layer === "climb" || st.layer === "conv" || st.layer === "wave" ?fr(v, v % 1 ? (v * 4 % 1 ? 2 : 1) : 0) : String(v);
   $("legend").innerHTML = `<div class="cap">${sc.cap}</div><div class="bar" style="background:linear-gradient(90deg,${stops.join(",")})"></div>
     <div class="ticks">${t.map(v => `<span>${fmt(v)}</span>`).join("")}</div>
     <div class="spots"><span class="ell"></span> pompe : zone où la trouver à 95 % (pleine si fiabilité ≥ 50 %, tiretée sinon ; affichée au zoom)
@@ -558,12 +558,16 @@ function drawDayChart() {
       g.fillStyle = v < 0.3 ? cs.getPropertyValue("--line") : css(SCALES.climb.col(v));
       g.beginPath(); g.roundRect(x + 5, base - Math.max(2, hh), bw - 10, Math.max(2, hh), [4, 4, 0, 0]); g.fill();
       if (v >= 0.3) { g.fillStyle = cs.getPropertyValue("--fg"); g.fillText(fr(v), x + bw / 2, base - hh - 7); }
+      // repères : surdéveloppement (triangle orange/rouge en haut), onde (trait bleu en bas)
+      const o = X.stats.over, w = X.stats.wave;
+      if (o && o.level) { g.fillStyle = o.level === 2 ? "#ef4444" : "#fbbf24"; g.beginPath(); g.moveTo(x + bw / 2 - 7, 30); g.lineTo(x + bw / 2 + 7, 30); g.lineTo(x + bw / 2, 22); g.fill(); }
+      if (w && w.idx > 0.25) { g.fillStyle = "#60a5fa"; g.globalAlpha = Math.min(1, 0.4 + w.idx); g.fillRect(x + 4, base + 2, bw - 8, 4); g.globalAlpha = 1; }
     }
     g.fillStyle = h === st.hour ? cs.getPropertyValue("--fg") : cs.getPropertyValue("--muted");
     g.fillText(h % 2 ? String(h) : "", x + bw / 2, Hc - 6);
   }
   g.fillStyle = cs.getPropertyValue("--muted"); g.textAlign = "left"; g.font = "14px system-ui, sans-serif";
-  g.fillText("Vz moyenne des 12 meilleures pompes (m/s), heure locale", 8, 16);
+  g.fillText("Vz moyenne des 12 meilleures pompes (m/s), heure locale · ▲ surdéveloppement · ▬ onde", 8, 16);
 }
 
 function writeSummary(s) {
@@ -581,6 +585,10 @@ function writeSummary(s) {
   if (s.wind10 > 7) fl.push(`vent soutenu au sol (${Math.round(s.wind10 * 3.6)} km/h)`);
   if (s.cloud > 75 && s.spotClimb >= 0.3) fl.push("ciel très nuageux : pompes irrégulières");
   if (s.snowLine < 2600) fl.push(`neige au-dessus de ${km(s.snowLine)} m environ`);
+  if (s.over && s.over.level === 2) fl.push(`cumulus très épais (${km(s.over.depth)} m) : congestus, averses ou orages probables`);
+  else if (s.over && s.over.level === 1) fl.push(`cumulus épais (${km(s.over.depth)} m) : étalements ou surdéveloppements possibles`);
+  if (s.wave && s.wave.idx > 0.25) fl.push(`onde ${s.wave.idx > 0.6 ? "probable" : "possible"} : vent ${Math.round(s.wave.u * 3.6)} km/h ${du(s.wave.dir)} vers 3 000 m, air stable, longueur d'onde ~${fr(s.wave.lambda / 1000)} km${s.wave.trapped ? ", ondes en série" : ""} (calque Onde)`);
+  if (s.wave && s.wave.foehn) fl.push("foehn du sud probable : rafales et rotors dans les vallées");
   if (s.challes) {
     const [u, v] = s.challes, sp = Math.hypot(u, v), d = windFrom(u, v);
     if (sp >= 3 && d >= 135 && d <= 225 && st.hour <= 16)

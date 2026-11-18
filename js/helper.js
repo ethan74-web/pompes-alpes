@@ -13,6 +13,7 @@ self.onmessage = async e => {
       const fl = F.flow;
       const tr = [F.H.buffer, F.Hloc.buffer, F.top.buffer, F.ceil.buffer, F.cu.buffer, F.climb.buffer, F.conv.buffer, F.Q.buffer, F.zl.buffer, F.fw.buffer,
         F.ua.buffer, F.va.buffer, fl.down.buffer, fl.fu.buffer, fl.fv.buffer, fl.acc.buffer, fl.src.buffer];
+      if (F.wave) tr.push(F.wave.buffer);
       self.postMessage({ type: "hour", job: m.job, F }, tr);
     }
   } catch (err) { self.postMessage({ type: "error", job: m.job, message: String(err && err.message || err) }); }
