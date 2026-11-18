@@ -161,6 +161,30 @@ export function hourIndex(W, date, h) {
 
 // Décalage de l'heure de Paris, heure d'été comprise (l'API ne donne que le décalage du jour où on l'interroge).
 function lastSunday(y, m) { const d = new Date(Date.UTC(y, m + 1, 0)); d.setUTCDate(d.getUTCDate() - d.getUTCDay()); return d.getTime(); }
+/**
+ * Prévision d'ensemble ECMWF (51 membres) en un point, pour un jour : une seule requête, à la demande.
+ * Renvoie { time, elev, members: [{ t2, td2, t: {925, 850, 700, 600, 500}, w700, d700, cloud, sw, cape }] } (tableaux horaires).
+ */
+const ENS_VARS = ["temperature_2m", "dew_point_2m", "temperature_925hPa", "temperature_850hPa", "temperature_700hPa", "temperature_600hPa",
+  "temperature_500hPa", "wind_speed_700hPa", "wind_direction_700hPa", "cloud_cover", "shortwave_radiation", "cape"];
+export async function fetchEnsemble(lat, lon, date) {
+  const u = `https://ensemble-api.open-meteo.com/v1/ensemble?latitude=${lat.toFixed(3)}&longitude=${lon.toFixed(3)}&hourly=${ENS_VARS.join(",")}`
+    + `&models=ecmwf_ifs025&start_date=${date}&end_date=${date}&timezone=Europe%2FParis`;
+  const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), 45000);
+  try {
+    const r = await fetch(u, { signal: ctl.signal }), j = await r.json();
+    if (j.error) throw new Error(j.reason);
+    const H = j.hourly, members = [];
+    for (let m = 0; m <= 50; m++) {
+      const g = v => H[m ? `${v}_member${String(m).padStart(2, "0")}` : v];
+      if (!g("temperature_2m")) continue;
+      members.push({ t2: g("temperature_2m"), td2: g("dew_point_2m"), t: { 925: g("temperature_925hPa"), 850: g("temperature_850hPa"), 700: g("temperature_700hPa"), 600: g("temperature_600hPa"), 500: g("temperature_500hPa") },
+        w700: g("wind_speed_700hPa"), d700: g("wind_direction_700hPa"), cloud: g("cloud_cover"), sw: g("shortwave_radiation"), cape: g("cape") });
+    }
+    return { time: H.time, elev: j.elevation, members };
+  } finally { clearTimeout(to); }
+}
+
 export function parisOffset(t) {
   const y = +t.slice(0, 4), u = Date.parse(t + ":00Z") - 7200e3;
   return u >= lastSunday(y, 2) + 3600e3 && u < lastSunday(y, 9) + 3600e3 ? 7200 : 3600;

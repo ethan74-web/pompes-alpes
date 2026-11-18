@@ -68,6 +68,9 @@
         </div>
         <p id="fieldText" class="summary"></p>
         <canvas id="fieldChart" width="640" height="190" aria-label="Pompes près du terrain heure par heure"></canvas>
+        <button id="ensBtn" type="button" class="big">Dispersion de l'ensemble ECMWF (51 prévisions)</button>
+        <p id="ensText" class="summary"></p>
+        <canvas id="ensChart" width="640" height="300" hidden aria-label="Sommet des thermiques selon les 51 membres de l'ensemble"></canvas>
       </section>
 
       <section>
@@ -95,6 +98,7 @@
           <label><input type="checkbox" id="showSpots" checked> Pompes probables</label>
           <label><input type="checkbox" id="showWind" checked> Vent</label>
           <label><input type="checkbox" id="showNames" checked> Noms</label>
+          <label title="Vent mesuré maintenant par les balises OpenWindMap (Pioupiou)"><input type="checkbox" id="showLive"> Balises en direct</label>
         </div>
         <div class="probrow">
           <label for="minProb">Pompes affichées : fiabilité ≥ <output id="minProbLabel">30 %</output> <span id="spotCount" class="muted"></span></label>
@@ -135,7 +139,7 @@
         <p>Chaque heure, le site calcule l'énergie reçue par chaque pente de 150 m (soleil, ombres portées, nuages) et la chaleur que le sol rend à l'air. Les brises de pente et le vent, ajusté au relief, ramassent cette chaleur et la concentrent là où ils convergent : ce sont les <b>pompes</b>, plus fortes et plus étroites que les thermiques ordinaires autour.</p>
         <p>L'<b>ellipse</b> est la zone où l'on a 95 % de chances de trouver le thermique en spiralant ; elle s'allonge dans le sens où le modèle hésite (le long d'une crête, sous le vent). La <b>fiabilité</b> classe chaque pompe parmi ses voisines à moins de 15 km (alimentation, relief qui fixe le déclenchement), multipliée par la part des cas simulés où elle est exploitable (au moins 0,5 m/s au vario et 300 m de gain) : chaque secteur garde ses pompes les plus sûres, et une journée faible reste faible. Ce n'est pas encore une fréquence mesurée : elle sera recalée sur des traces de vol. Le curseur n'affiche que les pompes au-dessus du seuil choisi. Cliquez sur une pompe pour la voir en 3D (vitesses selon l'altitude, inclinaison conseillée, turbulence) ; au-dessus de 3 m/s, vous voyez aussi d'où vient son air et ce qu'elle devient selon le vent.</p>
         <p class="warn">Modèle expérimental, recalé sur un seul jour de vol pour l'instant : ordres de grandeur, pas une garantie. Il ne remplace ni un briefing météo ni votre jugement en vol.</p>
-        <p class="credits">Météo : <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Relief : SRTM (NASA). Fonds : © OpenStreetMap, OpenTopoMap.</p>
+        <p class="credits">Météo : <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Relief : SRTM (NASA). Fonds : © OpenStreetMap, OpenTopoMap. Balises : vent © contributeurs du réseau <a href="https://openwindmap.org" target="_blank" rel="noopener">OpenWindMap</a>.</p>
         <a class="theory" href="theorie.html">Le modèle en détail</a>
       </section>
     </aside>

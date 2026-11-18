@@ -1,7 +1,7 @@
 // Interface : carte Leaflet, calques calculés en arrière-plan (worker.js), curseur horaire, diagnostic au clic,
 // alimentation des pompes, choix et comparaison des modèles météo.
 import { SCALES, css } from "./scales.js";
-import { addDays, isoDate, MODELS, DEFAULT_MODEL } from "./weather.js";
+import { addDays, isoDate, MODELS, DEFAULT_MODEL, fetchEnsemble } from "./weather.js";
 import { drawBank, drawProfile, pause3D, pumpText, showPump3D } from "./pump3d.js";
 import { GLIDERS } from "./model.js";
 import { compareFlight, findThermals, flightStats, localHour, parseIGC } from "./igc.js";
@@ -18,7 +18,7 @@ const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { ret
 const st = { meta: null, date: null, hour: 14, layer: "climb", hours: new Map(), dayScores: new Map(), token: 0, point: null, playing: null,
   week: null, wanted: null, deferred: false, done: false, source: "", model: DEFAULT_MODEL, cmp: null, cmpToken: 0, feed: null };
 if (MODELS.some(m => m.id === store.get("model"))) st.model = store.get("model");
-let map, bounds, fieldLayer, windLayer, spotsLayer, namesLayer, feedLayer, baseLayers, canvas, ctx, wcanvas, wctx, worker, spotRenderer, flightLayer;
+let map, bounds, fieldLayer, windLayer, spotsLayer, namesLayer, feedLayer, baseLayers, canvas, ctx, wcanvas, wctx, worker, spotRenderer, flightLayer, liveLayer;
 window.__pompes = st;                       // accès pour le débogage dans la console
 window.__feed = (i, j) => askPoint(L.latLng(...cellCenter(i, j)), false, true);
 
@@ -111,8 +111,14 @@ function onReady(meta) {
     $("hour").value = st.hour; stopPlay(); render();
   });
   $("open3d").addEventListener("click", open3D);
+  $("ensBtn").addEventListener("click", runEnsemble);
   $("exportCup").addEventListener("click", exportCup);
   flightLayer = L.layerGroup().addTo(map);
+  liveLayer = L.layerGroup().addTo(map);
+  if (store.get("live") === "1") $("showLive").checked = true;
+  $("showLive").addEventListener("change", e => { store.set("live", e.target.checked ? "1" : "0"); refreshLive(); });
+  setInterval(() => { if ($("showLive").checked && document.visibilityState === "visible") refreshLive(); }, 300e3);
+  refreshLive();
   $("igc").addEventListener("change", e => loadFlights(e.target.files));
   $("flightClear").addEventListener("click", () => { st.flights = []; st.flight = null; flightLayer.clearLayers(); drawFlightList(); $("flightText").textContent = ""; $("flightTable").innerHTML = ""; });
   for (const ev of ["dragover", "drop"]) $("map").addEventListener(ev, e => {
@@ -197,6 +203,7 @@ function onWorker(m) {
     ctx.putImageData(new ImageData(new Uint8ClampedArray(m.img), st.meta.nx, st.meta.ny), 0, 0);
     st.surf = m.surf;
     drawArrows(m.arrows);
+    if (st.live) drawLive();
   } else if (m.type === "point") {
     if (m.h === st.hour) showPoint(m.D);
   }
@@ -374,6 +381,121 @@ function drawSpots() {
     }
   }
   $("spotCount").textContent = overview ? `(${shown} principales, ${X.spots.filter(s => s.prob >= minP).length} en zoomant)` : `(${shown} sur ${X.spots.length})`;
+}
+
+// ---------------------------------------------------------------- ensemble ECMWF au terrain : dispersion des prévisions
+const ISA = { 925: 762, 850: 1457, 700: 3012, 600: 4206, 500: 5574 };
+const pIsa = z => 1013.25 * Math.pow(1 - 2.25577e-5 * z, 5.25588);
+/** Sommet d'une particule partie du sol (+1,5 K), par la courbe adiabatique sèche, dans le profil d'un membre. */
+function ensTop(M, k, z0) {
+  const th = (T, p) => (T + 273.15) * Math.pow(1000 / p, 0.2857);
+  const thP = th(M.t2[k] + 1.5, pIsa(z0));
+  let zPrev = z0, dPrev = thP - th(M.t2[k], pIsa(z0));
+  for (const p of [925, 850, 700, 600, 500]) {
+    const z = ISA[p], T = M.t[p][k];
+    if (z <= z0 + 50 || T == null) continue;
+    const d = thP - th(T, p);
+    if (d < 0) return zPrev + (z - zPrev) * dPrev / Math.max(1e-6, dPrev - d);
+    zPrev = z; dPrev = d;
+  }
+  return 6000;
+}
+async function runEnsemble() {
+  const f = st.meta.places.find(p => p.name === $("field").value), date = st.date;
+  if (!f || !date) return;
+  $("ensText").textContent = "Requête à l'ensemble ECMWF…"; $("ensChart").hidden = true;
+  let E;
+  try { E = await fetchEnsemble(f.lat, f.lon, date); }
+  catch (e) { $("ensText").textContent = "Ensemble indisponible pour cette date (il ne couvre que les jours récents et à venir) : " + e.message; return; }
+  const q = (a, x) => { const b = a.filter(v => v === v).sort((u, v) => u - v); return b.length ? b[Math.min(b.length - 1, Math.floor(x * b.length))] : NaN; };
+  const hours = [], z0 = E.elev;
+  E.time.forEach((t, k) => {
+    const h = +t.slice(11, 13);
+    if (h < 8 || h > 20) return;
+    const tops = [], bases = [], capes = [], clouds = [], winds = [];
+    for (const M of E.members) {
+      if (M.t2[k] == null) continue;
+      const sunny = (M.sw[k] || 0) > 60, top = sunny ? ensTop(M, k, z0) : z0, base = z0 + 125 * (M.t2[k] - M.td2[k]);
+      tops.push(top); if (base < top) bases.push(base);
+      capes.push(M.cape[k] || 0); clouds.push(M.cloud[k] || 0); if (M.w700[k] != null) winds.push(M.w700[k]);
+    }
+    hours.push({ h, n: tops.length, lo: q(tops, 0.1), med: q(tops, 0.5), hi: q(tops, 0.9), cu: bases.length, base: q(bases, 0.5),
+      pc: capes.filter(c => c > 500).length / Math.max(1, capes.length), cloud: q(clouds, 0.5), wLo: q(winds, 0.1), wHi: q(winds, 0.9) });
+  });
+  const H = hours.find(x => x.h === Math.min(20, Math.max(8, st.hour))) || hours[0];
+  if (!H) { $("ensText").textContent = "Pas de données d'ensemble pour cette journée."; return; }
+  const spread = H.hi - H.lo, agree = spread < 600 ? "bon" : spread < 1200 ? "moyen" : "faible";
+  $("ensText").innerHTML = `<b>Ensemble ECMWF, ${f.name.replace(/ \(.*\)/, "")} à ${H.h} h</b> (${H.n} prévisions, maille de 25 km : un ordre de grandeur de l'incertitude, pas le plafond local) : `
+    + `sommet des thermiques ${km(H.med)} m (10–90 % : ${km(H.lo)} à ${km(H.hi)} m), accord <b>${agree}</b> ; `
+    + `cumulus pour ${H.cu} prévisions sur ${H.n}${H.cu ? `, base médiane ${km(H.base)} m` : ""} ; vent vers 3 000 m ${Math.round(H.wLo)} à ${Math.round(H.wHi)} km/h`
+    + (H.pc > 0.2 ? ` ; <span style="color:#fbbf24">${Math.round(H.pc * 100)} % des prévisions donnent de l'instabilité (CAPE > 500 J/kg)</span>` : "") + ".";
+  const c = $("ensChart"), g = c.getContext("2d"), W = c.width, Hc = c.height, cs = getComputedStyle(document.documentElement), col = k => cs.getPropertyValue(k).trim();
+  c.hidden = false; g.clearRect(0, 0, W, Hc);
+  const L0 = 58, R0 = 12, T0 = 28, B0 = 44, zmin = Math.floor(z0 / 500) * 500, zmax = Math.max(zmin + 1500, Math.ceil((Math.max(...hours.map(x => x.hi)) + 300) / 500) * 500);
+  const X = h => L0 + (h - 8) / 12 * (W - L0 - R0), Y = z => Hc - B0 - (z - zmin) / (zmax - zmin) * (Hc - T0 - B0);
+  g.font = "14px system-ui, sans-serif"; g.strokeStyle = col("--line"); g.fillStyle = col("--muted"); g.lineWidth = 1; g.textAlign = "right";
+  for (let z = zmin; z <= zmax; z += 500) { g.beginPath(); g.moveTo(L0, Y(z)); g.lineTo(W - R0, Y(z)); g.stroke(); g.fillText(km(z), L0 - 6, Y(z) + 5); }
+  g.textAlign = "center"; for (let h = 8; h <= 20; h += 2) g.fillText(h + " h", X(h), Hc - B0 + 18);
+  g.fillStyle = "rgba(249,115,22,.28)"; g.beginPath();
+  hours.forEach((x, k) => (k ? g.lineTo(X(x.h), Y(x.hi)) : g.moveTo(X(x.h), Y(x.hi))));
+  hours.slice().reverse().forEach(x => g.lineTo(X(x.h), Y(x.lo))); g.closePath(); g.fill();
+  g.strokeStyle = "#f97316"; g.lineWidth = 3; g.beginPath(); hours.forEach((x, k) => (k ? g.lineTo(X(x.h), Y(x.med)) : g.moveTo(X(x.h), Y(x.med)))); g.stroke();
+  g.strokeStyle = "#60a5fa"; g.lineWidth = 2; g.setLineDash([6, 5]); g.beginPath();
+  let started = false; for (const x of hours) { if (x.cu < x.n / 3) { started = false; continue; } started ? g.lineTo(X(x.h), Y(x.base)) : g.moveTo(X(x.h), Y(x.base)); started = true; }
+  g.stroke(); g.setLineDash([]);
+  for (const x of hours) {
+    g.fillStyle = "rgba(200,200,200,.5)"; g.fillRect(X(x.h) - 6, Hc - B0 + 24, 12, -0.1 * x.cloud);
+    if (x.pc > 0.2) { g.fillStyle = "#ef4444"; g.globalAlpha = Math.min(1, x.pc + 0.3); g.beginPath(); g.moveTo(X(x.h) - 6, T0 - 4); g.lineTo(X(x.h) + 6, T0 - 4); g.lineTo(X(x.h), T0 + 6); g.fill(); g.globalAlpha = 1; }
+  }
+  g.textAlign = "left"; g.fillStyle = col("--ink2"); g.font = "13px system-ui, sans-serif";
+  g.fillText("sommet des thermiques : médiane et 10–90 % · tirets : base des cumulus · gris : nébulosité · ▼ instabilité", 6, 16);
+}
+
+// ---------------------------------------------------------------- balises de vent en temps réel (OpenWindMap / Pioupiou)
+async function refreshLive() {
+  if (!liveLayer) return;
+  if (!$("showLive").checked) { liveLayer.clearLayers(); st.live = null; return; }
+  try {
+    const r = await fetch("https://api.pioupiou.fr/v1/live-with-meta/all");
+    const j = await r.json(), m = st.meta;
+    st.live = (j.data || []).filter(s => s.location && s.measurements && s.measurements.wind_speed_avg != null
+      && s.location.latitude > m.south && s.location.latitude < m.north && s.location.longitude > m.west && s.location.longitude < m.east
+      && Date.now() - Date.parse(s.measurements.date) < 3 * 3600e3)
+      .map(s => ({ name: s.meta.name, lat: s.location.latitude, lon: s.location.longitude, from: s.measurements.wind_heading,
+        avg: s.measurements.wind_speed_avg, min: s.measurements.wind_speed_min, max: s.measurements.wind_speed_max, age: (Date.now() - Date.parse(s.measurements.date)) / 60e3 }));
+    drawLive();
+  } catch (e) { setStatus("Balises en direct indisponibles : " + e.message, true); }
+}
+/** Vent prévu près du relief (brises + vent) au point le plus proche, à l'heure affichée : [u, v] m/s, ou null. */
+function surfAt(lat, lon) {
+  const b = st.surf, m = st.meta;
+  if (!b) return null;
+  const i = (lon - m.west) / (m.east - m.west) * m.nx, j = (m.north - lat) / (m.north - m.south) * m.ny;
+  let best = null, bd = 1e9;
+  for (let k = 0; k < b.length; k += 4) { const d = (b[k] - i) ** 2 + (b[k + 1] - j) ** 2; if (d < bd) { bd = d; best = k; } }
+  return best == null || bd > 64 ? null : [b[best + 2], b[best + 3]];
+}
+function drawLive() {
+  liveLayer.clearLayers();
+  if (!st.live || !$("showLive").checked) return;
+  const today = st.date === isoDate(new Date());
+  for (const s of st.live) {
+    const col = s.avg < 10 ? "#a7f3d0" : s.avg < 20 ? "#fde047" : s.avg < 30 ? "#fb923c" : "#ef4444", len = 22;
+    const svg = `<svg width="${len + 10}" height="${len + 10}" viewBox="${-(len + 10) / 2} ${-(len + 10) / 2} ${len + 10} ${len + 10}" style="transform:rotate(${s.from + 180}deg)">`
+      + `<circle r="4" fill="${col}" stroke="#0b0d0e" stroke-width="1.5"/>`
+      + `<path d="M0 0 V${-len / 2} M-4 ${-len / 2 + 6} L0 ${-len / 2} L4 ${-len / 2 + 6}" stroke="#0b0d0e" stroke-width="4" fill="none" stroke-linecap="round"/>`
+      + `<path d="M0 0 V${-len / 2} M-4 ${-len / 2 + 6} L0 ${-len / 2} L4 ${-len / 2 + 6}" stroke="${col}" stroke-width="2" fill="none" stroke-linecap="round"/></svg>`;
+    const f = today ? surfAt(s.lat, s.lon) : null;
+    const pred = f ? `<br>prévu près du relief à ${st.hour} h : ${Math.round(Math.hypot(...f) * 3.6)} km/h ${Math.hypot(...f) > 0.5 ? du(windFrom(...f)) : ""}` : "";
+    liveLayer.addLayer(L.marker([s.lat, s.lon], { keyboard: false, icon: L.divIcon({ className: "wind", html: svg, iconSize: [len + 10, len + 10], iconAnchor: [(len + 10) / 2, (len + 10) / 2] }) })
+      .bindTooltip(`<b>${s.name}</b> · il y a ${Math.round(s.age)} min<br>vent ${Math.round(s.avg)} km/h ${du(s.from)} (${Math.round(s.min)} à ${Math.round(s.max)})${pred}<br><span class="muted">© OpenWindMap</span>`, { className: "spot", direction: "top" }));
+  }
+}
+/** Balises à moins de 12 km d'un point : texte court pour l'alimentation d'une pompe. */
+function liveNear(lat, lon) {
+  if (!st.live) return "";
+  const near = st.live.map(s => ({ s, d: Math.hypot((s.lat - lat) * 111.3, (s.lon - lon) * 111.3 * Math.cos(lat * Math.PI / 180)) })).filter(x => x.d < 12).sort((a, b) => a.d - b.d).slice(0, 3);
+  return near.length ? `<br>Balises proches maintenant : ` + near.map(({ s, d }) => `${s.name} (${fr(d, 0)} km) ${Math.round(s.avg)} km/h ${du(s.from)}`).join(" · ") + "." : "";
 }
 
 // ---------------------------------------------------------------- mes vols : traces IGC comparées à la prévision
@@ -679,7 +801,8 @@ function drawFeed(f) {
     + ` Vent prévu près du relief : <b>${Math.round(amb * 3.6)} km/h ${du(ad)}</b> → Vz +${fr(Math.max(0, f.vzNow))} m/s.`
     + (ok.length ? `<br>Par 20 km/h, la pompe tient avec un vent <b>${names(ok)}</b>.` : "")
     + (nw >= 6 && !ok.length ? `<br>Par 20 km/h, elle faiblit beaucoup quelle que soit la direction : pompe fragile, à prendre par vent faible.`
-      : weak.length ? `<br>Elle faiblit beaucoup ou se déplace par vent <b>${names(weak)}</b> (20 km/h).` : "");
+      : weak.length ? `<br>Elle faiblit beaucoup ou se déplace par vent <b>${names(weak)}</b> (20 km/h).` : "")
+    + (st.point && st.date === isoDate(new Date()) ? liveNear(st.point.lat, st.point.lng) : "");
   $("feedBox").hidden = false;
   drawRose(f);
 }

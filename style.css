@@ -91,6 +91,7 @@ h3.sub { font-size: 13px; margin: 12px 0 0; color: var(--ink); }
 #flightTable tr { cursor: pointer; }
 #flightTable tr:hover td { background: var(--surf2); }
 .leaflet-tooltip.spot .pass { color: #fbbf24; }
+#ensChart { width: 100%; height: auto; margin-top: 10px; display: block; border-radius: 8px; background: var(--surf2); }
 #fieldChart { width: 100%; height: auto; margin-top: 10px; display: block; border-radius: 8px; background: var(--surf2); }
 .probrow label { display: block; font-size: 14px; }
 .probrow output { color: var(--ink); font-weight: 700; }
