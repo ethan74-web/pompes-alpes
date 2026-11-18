@@ -115,7 +115,7 @@
   $$v_b = 3\ \text{m/s}\times\Big(\min\big(1{,}3,\tfrac{H}{300}\big)\Big)^{1/3}\Big(\min\big(1,\tfrac{\tan\gamma}{0{,}35}\big)\Big)^{1/2}$$
   <p>dans la direction de la montée \(\hat u\) (relief lissé à 200 m). L'air près du sol suit \(\vec v = v_b\,\hat u + 0{,}6\,\vec U'\) : 60 % du vent atteint les premières dizaines de mètres. Ces flèches vertes sont affichées quand on zoome sur la carte.</p>
   <h3>Chaleur collectée</h3>
-  <p>Chaque maille envoie son air vers la voisine (parmi 8) dans la direction de \(\vec v\). Le long de ces trajets, l'air accumule la chaleur des pentes qu'il longe, \(H\,\Delta x^2\) par maille, avec une perte \(e^{-\Delta x/2{,}5\,\text{km}}\) à chaque pas et un trajet de 3 km au plus. Là où deux mailles s'envoient l'air l'une à l'autre (crête de convergence), il monte dans la plus haute. La chaleur \(Q\) (en watts) relâchée en montée dans un rayon de 300 m nourrit un panache. L'indice d'alimentation affiché vaut \(Q/Q_0\) avec \(Q_0 = 2\) GW.</p>
+  <p>Chaque maille envoie son air vers la voisine (parmi 8) dans la direction de \(\vec v\). Le long de ces trajets, l'air accumule la chaleur des pentes qu'il longe, \(H\,\Delta x^2\) par maille, avec une perte \(e^{-\Delta x/2{,}5\,\text{km}}\) à chaque pas et un trajet de 3 km au plus. Là où deux mailles s'envoient l'air l'une à l'autre (crête de convergence), il monte dans la plus haute. La chaleur \(Q\) (en watts) relâchée en montée dans un rayon d'environ 300 m (noyau en cloche) nourrit un panache. L'indice d'alimentation affiché vaut \(Q/Q_0\) avec \(Q_0 = 2\) GW.</p>
   <p>Une crête droite reçoit l'air de ses deux versants sur toute sa longueur ; un éperon, un sommet ou une confluence reçoivent l'air de plusieurs côtés et concentrent bien plus de chaleur : c'est là que naissent les pompes étroites et puissantes. Le vent les déplace : il renforce l'alimentation au vent et la coupe sous le vent quand il dépasse la brise.</p>
 
   <h2><small>Étape 5</small>Du thermique au vario</h2>
@@ -129,7 +129,7 @@
   <h3>Panache concentré</h3>
   <p>Au-dessus d'une convergence, la chaleur collectée \(Q\) forme un panache de flux de flottabilité \(B = \frac{g}{\theta}\frac{Q}{\rho c_p}\) (m⁴/s³). La théorie des panaches de Morton, Taylor et Turner (1956) donne, à la hauteur \(z'\) au-dessus de son origine virtuelle (150 m sous le sol),</p>
   $$w_P = k_P\,B^{1/3}\,z'^{-1/3}\,\big(1-\zeta^2\big), \qquad R_P = 0{,}12\,z'$$
-  <p>Avec un coefficient d'entraînement de 0,1, la théorie donne \(k_P = 2{,}55\) pour un panache continu ; le recalage sur les vols donne \(k_P = 1{,}5\), c'est-à-dire qu'environ 20 % de la chaleur collectée part dans le panache. Le facteur \(1-\zeta^2\) l'éteint sous le sommet de la couche. Un panache est étroit (140 m de rayon à 1 000 m au-dessus du sol) : il faut le serrer, mais il est régulier.</p>
+  <p>Avec un coefficient d'entraînement de 0,1, la théorie donne \(k_P = 2{,}55\) pour un panache continu ; le recalage sur les vols donne \(k_P = 1{,}3\), c'est-à-dire qu'environ 13 % de la chaleur collectée part dans le panache. Le facteur \(1-\zeta^2\) l'éteint sous le sommet de la couche. Un panache est étroit (140 m de rayon à 1 000 m au-dessus du sol) : il faut le serrer, mais il est régulier.</p>
   <h3>Le planeur en spirale</h3>
   <p>À 90 km/h (\(V = 25\) m/s) et 45° d'inclinaison, le rayon de virage est</p>
   $$r_v = \frac{V^2}{g\tan\varphi} = 63{,}7\ \text{m}$$
@@ -170,19 +170,19 @@
   <div class="tbl"><table>
     <thead><tr><th>Pompe</th><th>Relevé Vz / plafond</th><th>Pompe annoncée (distance) : Vz / plafond</th></tr></thead>
     <tbody>
-      <tr><td>Mont Saint-Michel, 14 h 45 – 14 h 55</td><td>1,5 / 1 300 – 1 430</td><td>3,6 / 3 290 (0,8–1,1 km)</td></tr>
-      <tr><td>Pic de la Sauge, 15 h 05</td><td>3 / 3 100</td><td>3,6 / 3 550 (0,3 km)</td></tr>
-      <tr><td>Dent d'Arclusaz, 15 h 10</td><td>3 / 3 250</td><td>4,4 / 3 550 (1,0 km)</td></tr>
-      <tr><td>Mont Charvin, 15 h 35</td><td>3,5 / 3 600</td><td>3,3 / 3 560 (0,3 km)</td></tr>
-      <tr><td>Col de Balme (La Clusaz), 15 h 40</td><td>3 / 3 500</td><td>3,3 / 3 610 (1,5 km)</td></tr>
-      <tr><td>Pointe de la Blonnière, 16 h</td><td>2,5 / 3 750</td><td>3,2 / 3 620 (1,8 km)</td></tr>
-      <tr><td>La Tuile (Grand Arc), 16 h 20</td><td>5 / 3 900</td><td>3,6 / 3 840 (1,1 km)</td></tr>
+      <tr><td>Mont Saint-Michel, 14 h 45 – 14 h 55</td><td>1,5 / 1 300 – 1 430</td><td>3,5 / 3 290 (0,8–1,1 km)</td></tr>
+      <tr><td>Pic de la Sauge, 15 h 05</td><td>3 / 3 100</td><td>3,5 / 3 550 (0,3 km)</td></tr>
+      <tr><td>Dent d'Arclusaz, 15 h 10</td><td>3 / 3 250</td><td>4,3 / 3 550 (1,0 km)</td></tr>
+      <tr><td>Mont Charvin, 15 h 35</td><td>3,5 / 3 600</td><td>3,2 / 3 560 (0,3 km)</td></tr>
+      <tr><td>Col de Balme (La Clusaz), 15 h 40</td><td>3 / 3 500</td><td>3,2 / 3 610 (1,5 km)</td></tr>
+      <tr><td>Pointe de la Blonnière, 16 h</td><td>2,5 / 3 750</td><td>3,1 / 3 620 (1,8 km)</td></tr>
+      <tr><td>La Tuile (Grand Arc), 16 h 20</td><td>5 / 3 900</td><td>3,5 / 3 840 (1,1 km)</td></tr>
       <tr><td>Cime de la Jasse (7 Laux), 16 h 55</td><td>3,5 / 3 400</td><td>2,7 / 3 560 (1,6 km)</td></tr>
       <tr><td>Margériaz sud, 17 h 45</td><td>3,5 / 3 200</td><td>aucune à moins de 5 km (1,0 / 2 580)</td></tr>
     </tbody>
   </table></div>
-  <p>Sur les huit pompes de relief : Vz de la pompe annoncée, biais +0,1 m/s et écart quadratique 0,9 m/s (sept pompes à moins de 2 km) ; plafond, biais +50 m et écart quadratique 250 m. Sept Vz sur huit et les huit plafonds tombent dans les fourchettes à 95 % ; sept pompes sur huit tombent dans l'ellipse de la pompe annoncée la plus proche, une fois l'écart type du point de déclenchement porté à 1 km (positions relevées « par secteur »). Coefficients retenus : \(k_P = 1{,}5\) (environ 20 % de la chaleur collectée part dans le panache), entraînement \(L_e = 2\) km, plafond à 93 % de la couche.</p>
-  <p>Défauts restants : au Mont Saint-Michel, aucun modèle ne voyait le couvercle qui a arrêté les thermiques vers 1 400 m (la colline reçoit beaucoup d'air chaud de la plaine, d'où 3,6 m/s annoncés) ; la Vz baisse trop vite en fin d'après-midi (Jasse, Margériaz) ; la pompe « fusée » de la Tuile (5 m/s, étroite) est sous-estimée.</p>
+  <p>Sur les huit pompes de relief : Vz de la pompe annoncée, biais nul et écart quadratique 0,9 m/s (sept pompes à moins de 2 km) ; plafond, biais +50 m et écart quadratique 250 m. Sept Vz sur huit et les huit plafonds tombent dans les fourchettes à 95 % ; sept pompes sur huit tombent dans l'ellipse de la pompe annoncée la plus proche, une fois l'écart type du point de déclenchement porté à 1 km (positions relevées « par secteur »). Coefficients retenus : \(k_P = 1{,}3\) (environ 13 % de la chaleur collectée part dans le panache), entraînement \(L_e = 2\) km, plafond à 93 % de la couche.</p>
+  <p>Défauts restants : au Mont Saint-Michel, aucun modèle ne voyait le couvercle qui a arrêté les thermiques vers 1 400 m (la colline reçoit beaucoup d'air chaud de la plaine, d'où 3,5 m/s annoncés) ; la Vz baisse trop vite en fin d'après-midi (Jasse, Margériaz) ; la pompe « fusée » de la Tuile (5 m/s, étroite) est sous-estimée.</p>
   <div class="note">Un seul jour de vol : ces coefficients sont provisoires. Chaque nouveau vol (pompes trouvées, et aussi pompes cherchées sans succès) affinera les facteurs, les écarts types et la loi \(P_{\text{site}}\).</div>
 
   <h2><small>Limites</small>Ce que le modèle ne fait pas</h2>

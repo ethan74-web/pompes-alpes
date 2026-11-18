@@ -35,7 +35,7 @@ export const PARAM = {
   vzMin: 0.5, gainMin: 300, // « exploitable » : Vz d'au moins 0,5 m/s et 300 m de gain possible
   kField: 1.2,              // thermique moyen en montagne / thermique moyen en plaine (Allen)
   reliefZ: [700, 1500],     // kField passe de 1 à sa valeur entre ces altitudes
-  kPlume: 1.5,              // panache : w = kPlume · B^(1/3) · z^(-1/3) (théorie MTT : 2,55 · rendement^(1/3))
+  kPlume: 1.3,              // panache : w = kPlume · B^(1/3) · z^(-1/3) (théorie MTT : 2,55 · rendement^(1/3))
   trigSd: 1000,             // écart type du point de déclenchement autour de la zone favorable (m) : 7 pompes sur 8 dans l'ellipse le 8/07
   z0Plume: 150,             // origine virtuelle du panache sous le sol (m)
   excess: [0.4, 1.6],       // surchauffe de la particule au départ : a + b · min(1, H/300) (K)
@@ -347,8 +347,8 @@ function feedFlow(T, Hreg, amb, i0, i1, j0, j1) {
 function plumeHeat(fl) {
   const { w, h, down, acc } = fl, sink = new Float32Array(w * h);
   for (let q = 0; q < w * h; q++) if (down[q] < 0) sink[q] = acc[q];
-  // somme pondérée (noyau en cloche, ~300 m) : moyenne x 25 mailles
-  const out = blur(sink, w, h, 2, 2);
+  // somme pondérée (noyau en cloche presque rond, ~300 m) : moyenne x 25 mailles
+  const out = blur(sink, w, h, 1, 4);
   for (let q = 0; q < w * h; q++) out[q] *= 25;
   return out;
 }

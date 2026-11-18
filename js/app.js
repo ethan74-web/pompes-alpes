@@ -431,7 +431,7 @@ function drawFeed(f) {
   $("feedText").innerHTML = `Chaleur collectée : environ ${fr(f.total / 1e9, 1)} GW, apportée par ${f.paths.length} trajets principaux.`
     + ` Vent prévu près du relief : <b>${Math.round(amb * 3.6)} km/h ${du(ad)}</b> → Vz +${fr(Math.max(0, f.vzNow))} m/s.`
     + (ok.length ? `<br>Par 20 km/h, la pompe tient avec un vent <b>${names(ok)}</b>.` : "")
-    + (nw >= 6 ? `<br>Par 20 km/h, elle faiblit beaucoup quelle que soit la direction : pompe fragile, à prendre par vent faible.`
+    + (nw >= 6 && !ok.length ? `<br>Par 20 km/h, elle faiblit beaucoup quelle que soit la direction : pompe fragile, à prendre par vent faible.`
       : weak.length ? `<br>Elle faiblit beaucoup ou se déplace par vent <b>${names(weak)}</b> (20 km/h).` : "");
   $("feedBox").hidden = false;
   drawRose(f);
