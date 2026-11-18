@@ -110,6 +110,8 @@
   <p>Le vent du modèle, pris 200 m au-dessus de chaque maille, est ajusté au relief fin par la méthode MicroMet (Liston et Elder, 2006). Avec \(\Omega_s\) la pente dans le sens du vent et \(\Omega_c\) la courbure du relief sur environ 1 km, chacune ramenée à \([-0{,}5\,;\,0{,}5]\) :</p>
   $$U' = U\,\big(1 + 0{,}5\,\Omega_s + 0{,}5\,\Omega_c\big), \qquad \theta' = \theta - 0{,}5\,\Omega_s\,\sin 2(\xi - \theta)$$
   <p>Le vent accélère sur les pentes au vent et les bosses, ralentit sous le vent et dans les creux, et dévie pour longer les pentes (\(\xi\) : orientation de la pente, \(\theta\) : direction d'où vient le vent).</p>
+  <h3>Abri sous le vent</h3>
+  <p>Derrière une crête, l'écoulement décolle et ne descend pas le versant : la brise y monte librement et rencontre le vent à l'arête, ce qui crée une convergence. On le représente par l'indice d'abri de Winstral : le plus grand angle \(S_x\) sous lequel une maille voit le relief au vent, jusqu'à 1 km (calculé pour 16 directions). Le vent qui atteint le sol est multiplié par \(\operatorname{clip}_{[0{,}1;\,1]}\big(1 - (S_x - 2°)/12°\big)\) : plein à découvert, réduit à 10 % sur un versant abrité.</p>
   <h3>Brises de pente</h3>
   <p>Un versant chauffé engendre une brise montante :</p>
   $$v_b = 3\ \text{m/s}\times\Big(\min\big(1{,}3,\tfrac{H}{300}\big)\Big)^{1/3}\Big(\min\big(1,\tfrac{\tan\gamma}{0{,}35}\big)\Big)^{1/2}$$
@@ -140,7 +142,7 @@
   <p>Un vent de plus de 9 m/s dans la couche hache les thermiques (Vz réduite jusqu'à 40 %), une averse les éteint presque (× 0,35).</p>
 
   <h2><small>Étape 6</small>Les pompes et leur alimentation</h2>
-  <p>La Vz, pondérée par l'alimentation (\(\times(0{,}7 + 0{,}3\min(1, Q/Q_0))\)), est lissée, puis on retient ses maxima locaux, d'abord les plus forts, en imposant 1,65 km entre deux pompes (300 au plus). Le point affiché est le point de départ au sol ; le trait montre la dérive jusqu'au plafond.</p>
+  <p>La Vz, pondérée par l'alimentation (\(\times(0{,}7 + 0{,}3\min(1, Q/Q_0))\)), est lissée, puis on retient ses maxima locaux, d'abord les plus forts, en imposant 1,65 km entre deux pompes (450 au plus). Le point affiché est le point de départ au sol ; le trait montre la dérive jusqu'au plafond.</p>
   <p><b>Alimentation d'une pompe.</b> Pour une pompe de plus de 3 m/s, un clic montre la zone dont l'air chaud rejoint la pompe (à moins de 300 m) et les principaux trajets de cet air près du sol. La rose recalcule l'alimentation, dans une fenêtre de 18 km, pour un vent uniforme près du relief venant de 16 directions, de 0 à 40 km/h (ajusté au relief comme ci-dessus), et donne la Vz du meilleur panache à moins de 600 m de la pompe. Avec le vent réel des balises, on voit si la pompe a des chances d'être là.</p>
 
   <h2><small>Étape 7</small>Incertitudes à 95 % et probabilité</h2>
@@ -170,18 +172,19 @@
   <div class="tbl"><table>
     <thead><tr><th>Pompe</th><th>Relevé Vz / plafond</th><th>Pompe annoncée (distance) : Vz / plafond</th></tr></thead>
     <tbody>
-      <tr><td>Mont Saint-Michel, 14 h 45 – 14 h 55</td><td>1,5 / 1 300 – 1 430</td><td>3,5 / 3 290 (0,8–1,1 km)</td></tr>
-      <tr><td>Pic de la Sauge, 15 h 05</td><td>3 / 3 100</td><td>3,5 / 3 550 (0,3 km)</td></tr>
-      <tr><td>Dent d'Arclusaz, 15 h 10</td><td>3 / 3 250</td><td>4,3 / 3 550 (1,0 km)</td></tr>
+      <tr><td>Mont Saint-Michel, 14 h 45 – 14 h 55</td><td>1,5 / 1 300 – 1 430</td><td>3,5 / 3 250 (0,9 km)</td></tr>
+      <tr><td>Pic de la Sauge, 15 h 05</td><td>3 / 3 100</td><td>3,7 / 3 570 (sur place)</td></tr>
+      <tr><td>Dent d'Arclusaz, 15 h 10</td><td>3 / 3 250</td><td>4,3 / 3 610 (0,5 km)</td></tr>
       <tr><td>Mont Charvin, 15 h 35</td><td>3,5 / 3 600</td><td>3,2 / 3 560 (0,3 km)</td></tr>
-      <tr><td>Col de Balme (La Clusaz), 15 h 40</td><td>3 / 3 500</td><td>3,2 / 3 610 (1,5 km)</td></tr>
-      <tr><td>Pointe de la Blonnière, 16 h</td><td>2,5 / 3 750</td><td>3,1 / 3 620 (1,8 km)</td></tr>
-      <tr><td>La Tuile (Grand Arc), 16 h 20</td><td>5 / 3 900</td><td>3,5 / 3 840 (1,1 km)</td></tr>
-      <tr><td>Cime de la Jasse (7 Laux), 16 h 55</td><td>3,5 / 3 400</td><td>2,7 / 3 560 (1,6 km)</td></tr>
-      <tr><td>Margériaz sud, 17 h 45</td><td>3,5 / 3 200</td><td>aucune à moins de 5 km (1,0 / 2 580)</td></tr>
+      <tr><td>Col de Balme (La Clusaz), 15 h 40</td><td>3 / 3 500</td><td>3,0 / 3 600 (1,4 km)</td></tr>
+      <tr><td>Pointe de la Blonnière, 16 h</td><td>2,5 / 3 750</td><td>2,9 / 3 600 (1,6 km)</td></tr>
+      <tr><td>La Tuile (Grand Arc), 16 h 20</td><td>5 / 3 900</td><td>3,3 / 3 790 (sur place)</td></tr>
+      <tr><td>Cime de la Jasse (7 Laux), 16 h 55</td><td>3,5 / 3 400</td><td>2,4 / 3 710 (1,3 km)</td></tr>
+      <tr><td>Margériaz sud, 17 h 45</td><td>3,5 / 3 200</td><td>1,8 / 2 800 (1,5 km)</td></tr>
     </tbody>
   </table></div>
-  <p>Sur les huit pompes de relief : Vz de la pompe annoncée, biais nul et écart quadratique 0,9 m/s (sept pompes à moins de 2 km) ; plafond, biais +50 m et écart quadratique 250 m. Sept Vz sur huit et les huit plafonds tombent dans les fourchettes à 95 % ; sept pompes sur huit tombent dans l'ellipse de la pompe annoncée la plus proche, une fois l'écart type du point de déclenchement porté à 1 km (positions relevées « par secteur »). Coefficients retenus : \(k_P = 1{,}3\) (environ 13 % de la chaleur collectée part dans le panache), entraînement \(L_e = 2\) km, plafond à 93 % de la couche.</p>
+  <p>Sur les huit pompes de relief : Vz de la pompe annoncée, biais −0,3 m/s et écart quadratique 1,1 m/s (toutes à moins de 2 km) ; plafond, biais +60 m et écart quadratique 250 m. Les huit Vz et les huit plafonds tombent dans les fourchettes à 95 % ; sept pompes sur huit tombent dans l'ellipse de la pompe annoncée la plus proche, avec un écart type du point de déclenchement de 1 km (positions relevées « par secteur »). Coefficients retenus : \(k_P = 1{,}3\) (environ 13 % de la chaleur collectée part dans le panache), entraînement \(L_e = 2\) km, plafond à 93 % de la couche.</p>
+  <p><b>Arête sud du Margériaz.</b> Elle a été très active le 8 juillet et les jours suivants, mais la première version n'y montrait de pompe qu'une heure sur deux : le vent de nord du modèle était appliqué au ras du sol jusque sur les versants abrités. Avec l'abri sous le vent (étape 4), le secteur a une pompe presque toutes les heures de 11 h à 17 h, du 5 au 9 juillet, entre 3 et 4 m/s, classée parmi les 25 à 120 plus fortes de la carte (150 à 300 avant), avec une dérive qui suit l'arête vers le col des Prés.</p>
   <p>Défauts restants : au Mont Saint-Michel, aucun modèle ne voyait le couvercle qui a arrêté les thermiques vers 1 400 m (la colline reçoit beaucoup d'air chaud de la plaine, d'où 3,5 m/s annoncés) ; la Vz baisse trop vite en fin d'après-midi (Jasse, Margériaz) ; la pompe « fusée » de la Tuile (5 m/s, étroite) est sous-estimée.</p>
   <div class="note">Un seul jour de vol : ces coefficients sont provisoires. Chaque nouveau vol (pompes trouvées, et aussi pompes cherchées sans succès) affinera les facteurs, les écarts types et la loi \(P_{\text{site}}\).</div>
 
@@ -199,6 +202,7 @@
     <li>M. J. Allen, <i>Updraft Model for Development of Autonomous Soaring Uninhabited Air Vehicles</i>, AIAA 2006-1510, 2006.</li>
     <li>J. W. Deardorff, <i>Convective velocity and temperature scales for the unstable planetary boundary layer and for Rayleigh convection</i>, J. Atmos. Sci. 27, 1970.</li>
     <li>B. R. Morton, G. I. Taylor, J. S. Turner, <i>Turbulent gravitational convection from maintained and instantaneous sources</i>, Proc. R. Soc. Lond. A 234, 1956.</li>
+    <li>A. Winstral, K. Elder, R. E. Davis, <i>Spatial snow modeling of wind-redistributed snow using terrain-based parameters</i>, J. Hydrometeorology 3, 2002.</li>
     <li>G. E. Liston, K. Elder, <i>A meteorological distribution system for high-resolution terrestrial modeling (MicroMet)</i>, J. Hydrometeorology 7, 2006.</li>
     <li>R. B. Stull, <i>An Introduction to Boundary Layer Meteorology</i>, Kluwer, 1988.</li>
     <li>C. D. Whiteman, <i>Mountain Meteorology: Fundamentals and Applications</i>, Oxford University Press, 2000.</li>
