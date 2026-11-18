@@ -95,10 +95,12 @@ export function findThermals(F) {
     // altitudes lissées (bruit GPS)
     const altAt = k => { let x = 0, m = 0; for (let q = Math.max(a, k - 3); q <= Math.min(b, k + 3); q++) { x += P[q].alt; m++; } return x / m; };
     const base = altAt(a), top = altAt(b);
+    // meilleure montée sur 30 s, altitudes lissées (sauts du GPS écartés)
     let best = -9;
     for (let k = a, q = a; k <= b; k++) {
       while (q < b && P[q].t < P[k].t + 30) q++;
-      if (P[q].t - P[k].t >= 25) best = Math.max(best, (P[q].alt - P[k].alt) / (P[q].t - P[k].t));
+      const dt = P[q].t - P[k].t;
+      if (dt >= 25 && dt <= 40) { const v = (altAt(q) - altAt(k)) / dt; if (v < 12) best = Math.max(best, v); }
     }
     let v = 0, w = 0, m = 0;
     for (let k = a; k < b; k++) { v += gs[k]; w += Math.abs(rate[k]); m++; }
