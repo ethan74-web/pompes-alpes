@@ -133,11 +133,11 @@
   <p>avec \(\theta\approx 300\) K et \(\rho c_p\approx 1105\) J m⁻³ K⁻¹. On suit le modèle d'Allen (2006), tiré de mesures en plaine. À la hauteur relative \(\zeta = z/z_i\) :</p>
   $$\bar w = w_*\,\zeta^{1/3}(1-1{,}1\,\zeta), \qquad r_2 = 0{,}102\,\zeta^{1/3}(1-0{,}25\,\zeta)\,z_i$$
   $$w_A = 3\,\bar w\,\frac{1-q}{1-q^{3}}\,k_f, \qquad R_A = 0{,}75\,r_2\,k_f, \qquad q = 0{,}0011\,r_2 + 0{,}14$$
-  <p>Le facteur \(k_f\) vaut 1 sous 700 m et 1,2 au-dessus de 1 500 m : en montagne, le thermique moyen est un peu plus fort qu'en plaine. Il n'est pas recalé : les relevés portent sur les pompes choisies par le pilote, pas sur les thermiques ordinaires autour.</p>
+  <p>Le facteur de rayon \(k_f\) vaut 1 sous 1 200 m et 1,2 au-dessus de 2 800 m : en montagne, le thermique moyen est un peu plus large. Sa force (thermique moyen et panache) est multipliée par un facteur \(M(z)\) recalé sur les traces de vol (voir « Recalage sur les traces ») : 0,9 pour les pompes de fond de vallée (départ sous 1 000 m), 0,6 à 1 200 m, 0,9 à 2 800 m et au-dessus. Le chauffage \(H\) entre dans \(w_*\) et dans \(B\) à travers \(H' = 250\,(H/250)^{0{,}35}\) W/m² : les traces montrent un vario moyen presque constant de 14 h à 18 h, bien plus plat que l'ensoleillement (mémoire de la roche et de l'air chaud, organisation des thermiques).</p>
   <h3>Panache concentré</h3>
   <p>Au-dessus d'une convergence, la chaleur collectée \(Q\) forme un panache de flux de flottabilité \(B = \frac{g}{\theta}\frac{Q}{\rho c_p}\) (m⁴/s³). La théorie des panaches de Morton, Taylor et Turner (1956) donne, à la hauteur \(z'\) au-dessus de son origine virtuelle (150 m sous le sol),</p>
   $$w_P = k_P\,B^{1/3}\,z'^{-1/3}\,\big(1-\zeta^2\big), \qquad R_P = 0{,}12\,z'$$
-  <p>Avec un coefficient d'entraînement de 0,1, la théorie donne \(k_P = 2{,}55\) pour un panache continu ; le recalage sur les vols donne \(k_P = 1{,}3\), c'est-à-dire qu'environ 13 % de la chaleur collectée part dans le panache. Le facteur \(1-\zeta^2\) l'éteint sous le sommet de la couche. Un panache est étroit (140 m de rayon à 1 000 m au-dessus du sol) : il faut le serrer, mais il est régulier.</p>
+  <p>Avec un coefficient d'entraînement de 0,1, la théorie donne \(k_P = 2{,}55\) pour un panache continu ; le recalage sur les traces de vol donne \(k_P = 1{,}6\), c'est-à-dire qu'environ 25 % de la chaleur collectée part dans le panache (avant le facteur de force \(M(z)\)). Le facteur \(1-\zeta^2\) l'éteint sous le sommet de la couche. Un panache est étroit (140 m de rayon à 1 000 m au-dessus du sol) : il faut le serrer, mais il est régulier.</p>
   <h3>Le planeur en spirale</h3>
   <p>La polaire d'un planeur de classe standard est approchée par</p>
   $$s(V,n) = a_p V^3 + b_p\,\frac{n^2}{V}, \qquad a_p = 2{,}38\times10^{-5},\; b_p = 8{,}02$$
@@ -209,7 +209,25 @@
   <p><b>Balises en direct.</b> Vent moyen, minimum et maximum des balises du réseau OpenWindMap (Pioupiou), rafraîchi toutes les 5 minutes, comparé au vent prévu près du relief au même endroit. Pour une pompe, les trois balises les plus proches sont citées à côté de la rose d'alimentation.</p>
   <p><b>Traces IGC.</b> Une spirale est un virage continu de plus de 5°/s (lissé sur 15 s), sur au moins 1,5 tour et 40 s. On en tire la Vz moyenne (gain / durée), la meilleure Vz sur 30 s, la base et le sommet, le centre du premier tour (là où la pompe a été prise), la dérive des centres de tours (vent), le rayon \(r = v/\omega\) et l'inclinaison \(\varphi = \arctan(v\omega/g)\). Chacune est comparée à la pompe prévue la plus proche à la même heure. Les pompes prévues survolées en plané sous leur plafond, sans spirale à moins de 1,2 km dans les 5 minutes, sont notées « passées sans spiraler » : à confirmer, car le pilote peut les avoir manquées, cherchées au mauvais endroit, ou ne pas en avoir eu besoin. Sur plusieurs vols, la part des pompes survolées et prises, par classe de fiabilité, servira à recaler la fiabilité.</p>
 
+  <h2><small>Recalage</small>Sur les traces de vol</h2>
+  <p><b>Données.</b> Traces IGC publiques de deux pilotes de Challes : l'auteur de ce site (Pégase, ASK 23, ASK 21, Duo Discus ; 25 vols) et un très bon pilote du terrain (LS8 18 m, presque toujours au treuil ; vols de 2025 et 2026, en cours de récupération). Journée du 10/09/2026 écartée (front froid sur Chambéry, journée hors norme). Chaque vol est recalculé avec la polaire de son planeur.</p>
+  <p><b>Référence : le « vario moyen ».</b> C'est ce qu'affiche l'intégrateur (moyenne sur 30 s) une fois la pompe centrée : médiane des montées sur 30 s, fenêtres glissantes, après le premier tour. Sur les spirales de plus de 200 m de gain, il vaut en moyenne 1,9 m/s ; la montée moyenne (gain / durée, centrage compris) est un peu plus faible, les meilleures 30 s nettement plus fortes (3,2 m/s).</p>
+  <p><b>Ce que les traces ont appris.</b> Le recalage du 8 juillet reposait sur des Vz notées de mémoire (3 à 5 m/s) : le modèle surestimait le vario moyen de 0,8 m/s, surtout de 12 h à 16 h, et sous-estimait l'écart entre les pompes de haute montagne (2,8 m/s au-dessus de 2 300 m) et celles des Préalpes (1,8 m/s). Les paramètres de force (\(k_P\), \(M(z)\), aplatissement du chauffage) ont été cherchés sur une grille à partir des ingrédients enregistrés pour chaque pompe prévue, puis vérifiés avec le modèle complet. Ajustés sur la moitié des journées, ils gardent sur l'autre moitié un biais de +0,1 m/s et une corrélation de 0,3.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>37 vols, 212 spirales</th><th>Avant</th><th>Après</th></tr></thead>
+    <tbody>
+      <tr><td>Vario moyen : biais (prévu − relevé)</td><td class="n">+0,83 m/s</td><td class="n">+0,04 m/s</td></tr>
+      <tr><td>Écart quadratique (une valeur constante : 0,8)</td><td class="n">1,36 m/s</td><td class="n">0,78 m/s</td></tr>
+      <tr><td>Corrélation spirale par spirale</td><td class="n">0,17</td><td class="n">0,37</td></tr>
+      <tr><td>Vario moyen dans la fourchette à 95 %</td><td class="n">—</td><td class="n">97 %</td></tr>
+      <tr><td>Biais selon le pilote, l'heure (11 – 18 h), l'altitude, le planeur</td><td class="n">jusqu'à +1,4</td><td class="n">± 0,3</td></tr>
+      <tr><td>Plafond : corrélation (par vol : 0,89)</td><td class="n">0,78</td><td class="n">0,77</td></tr>
+    </tbody>
+  </table></div>
+  <p>Les sommets des spirales sont en moyenne 250 m sous le plafond prévu : on quitte souvent une pompe avant son sommet, ce n'est pas un biais du plafond. 60 à 65 % des spirales sont à moins de 1 km d'une pompe prévue. La fiabilité, en revanche, ne se vérifie pas encore : les pompes survolées sous leur plafond ont été prises dans environ un tiers des cas, quelle que soit leur fiabilité affichée. Les deux pilotes spiralent différemment : vers 35° et 130 m de rayon pour l'un, 41° et 105 m pour l'autre, qui monte mieux (2,4 m/s contre 1,7 en vario moyen).</p>
+
   <h2><small>Recalage</small>Le vol du 8 juillet 2026</h2>
+  <p class="note">Premier recalage, sur les Vz notées de mémoire par le pilote ; remplacé par le recalage sur les traces ci-dessus. Les valeurs « annoncées » ci-dessous sont celles de la version de l'époque.</p>
   <p>Circuit Pointe Percée – Chamrousse – Semnoz depuis Challes, 14 h 38 – 18 h 24. Dix pompes relevées (Vz au vario et plafond), heure estimée par la distance parcourue. Ce sont les pompes choisies par le pilote : on les compare à la pompe annoncée la plus proche (à moins de 2 km), pas au champ moyen. Données : « meilleur choix » d'Open-Meteo, à l'heure ronde la plus proche de chaque relevé.</p>
   <div class="tbl"><table>
     <thead><tr><th>Pompe</th><th>Relevé Vz / plafond</th><th>Pompe annoncée (distance) : Vz / plafond</th></tr></thead>

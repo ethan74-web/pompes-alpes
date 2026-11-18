@@ -699,7 +699,7 @@ function writeSummary(s) {
   } else {
     const rng = s.ceilHi - s.ceilLo >= 200 ? `<b>${km(s.ceilLo)} m</b> sur les premiers reliefs à <b>${km(s.ceilHi)} m</b> sur les plus hauts` : `vers <b>${km(s.ceilHi)} m</b>`;
     const sky = s.cuFrac > 0.6 ? `cumulus, base de ${rng}` : s.cuFrac > 0.2 ? `quelques cumulus, plafond de ${rng}` : `thermiques bleus, plafond de ${rng}`;
-    $("summary").innerHTML = `<b>${s.nSpots} pompes</b> fiables à plus de 50 % · Vz typique <b>+${fr(s.spotClimb)} m/s</b> au vario dans les meilleures · ${sky}`;
+    $("summary").innerHTML = `<b>${s.nSpots} pompes</b> fiables à plus de 50 % · vario moyen <b>+${fr(s.spotClimb)} m/s</b> dans les meilleures · ${sky}`;
   }
   const fl = [];
   if (s.rain > 0.3) fl.push("averses prévues");

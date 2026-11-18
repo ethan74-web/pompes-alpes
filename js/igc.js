@@ -102,13 +102,25 @@ export function findThermals(F) {
       const dt = P[q].t - P[k].t;
       if (dt >= 25 && dt <= 40) { const v = (altAt(q) - altAt(k)) / dt; if (v < 12) best = Math.max(best, v); }
     }
+    // « vario moyen » : ce qu'affiche l'intégrateur (moyenne sur 30 s) une fois centré : médiane des montées sur 30 s,
+    // fenêtres glissantes tous les ~5 s, après le premier tour (centrage)
+    const after = centers.length > 1 ? centers[0].t + 0.5 * (centers[1].t - centers[0].t) : P[a].t;
+    const win = [];
+    for (let k = a, q = a; k <= b; k += Math.max(1, Math.round(5 / Math.max(1, (P[b].t - P[a].t) / (b - a))))) {
+      if (P[k].t < after) continue;
+      while (q < b && P[q].t < P[k].t + 30) q++;
+      const dt = P[q].t - P[k].t;
+      if (dt >= 25 && dt <= 40) { const vv = (altAt(q) - altAt(k)) / dt; if (vv < 12) win.push(vv); }
+    }
+    win.sort((x, y) => x - y);
+    const avg = win.length ? win[win.length >> 1] : (top - base) / dur;
     let v = 0, w = 0, m = 0;
     for (let k = a; k < b; k++) { v += gs[k]; w += Math.abs(rate[k]); m++; }
     v /= m; w /= m;
     const c0 = centers[0], c1 = centers[centers.length - 1], dtc = Math.max(1, c1.t - c0.t);
     out.push({
       t0: P[a].t, t1: P[b].t, dur, circles: turn / (2 * Math.PI), lat: c0.lat, lon: c0.lon, latTop: c1.lat, lonTop: c1.lon,
-      base, top, gain: top - base, climb: (top - base) / dur, best,
+      base, top, gain: top - base, climb: (top - base) / dur, best, avg,
       radius: v / w, bank: Math.atan(v * w / 9.81) / D2R,
       drift: centers.length > 1 ? [east(c0, c1) / dtc, north(c0, c1) / dtc] : null,
       h: localHour(F.date, (P[a].t + P[b].t) / 2), a, b,

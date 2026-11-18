@@ -37,9 +37,17 @@ export const PARAM = {
   vMinKmh: 72,              // vitesse de spirale de base (km/h) d'un classe standard sans ballast ; V = vMin √n
   heights: [0.3, 0.5, 0.7], // hauteurs relatives dans la couche convective où l'on spirale
   vzMin: 0.5, gainMin: 300, // « exploitable » : Vz d'au moins 0,5 m/s et 300 m de gain possible
-  kField: 1.2,              // thermique moyen en montagne / thermique moyen en plaine (Allen)
-  reliefZ: [700, 1500],     // kField passe de 1 à sa valeur entre ces altitudes
-  kPlume: 1.3,              // panache : w = kPlume · B^(1/3) · z^(-1/3) (théorie MTT : 2,55 · rendement^(1/3))
+  // Recalé le 19/11/2026 sur 34 traces IGC (204 spirales, deux pilotes) contre le « vario moyen » (montée sur 30 s,
+  // une fois centré) : voir theorie.html, « Recalage sur les traces ».
+  kField: 1.2,              // rayon du thermique moyen en montagne / en plaine (Allen)
+  reliefZ: [1200, 2800],    // altitudes entre lesquelles le rayon et la force passent de la valeur basse à la haute
+  kVal: 0.9,                // force des thermiques des pompes de fond de vallée (sous zVal)
+  zVal: 1000,
+  kLow: 0.6,                // force des thermiques à reliefZ[0] ...
+  kHigh: 0.9,               // ... et à reliefZ[1] et au-dessus
+  heatRef: 250,             // aplatissement du cycle de la journée : la force suit H' = heatRef (H/heatRef)^heatGam
+  heatGam: 0.35,
+  kPlume: 1.6,              // panache : w = kPlume · B^(1/3) · z^(-1/3) (théorie MTT : 2,55 · rendement^(1/3))
   trigSd: 1000,             // écart type du point de déclenchement autour de la zone favorable (m) : 7 pompes sur 8 dans l'ellipse le 8/07
   z0Plume: 150,             // origine virtuelle du panache sous le sol (m)
   excess: [0.4, 1.6],       // surchauffe de la particule au départ : a + b · min(1, H/300) (K)
@@ -520,10 +528,23 @@ function shareHeat(fl, Q, spots, nx, ny, dx, ziOf) {
   return { Q: out, shared: lost };
 }
 
-/** Facteur du thermique moyen à l'altitude z (1 en vallée, kField en montagne). */
+/** Facteur de rayon du thermique moyen à l'altitude z (1 en bas, kField en montagne). */
 export function reliefGain(z) {
   const z0 = PARAM.reliefZ[0], z1 = PARAM.reliefZ[1], g = Math.min(1, Math.max(0, (z - z0) / (z1 - z0)));
   return 1 + (PARAM.kField - 1) * g;
+}
+/**
+ * Facteur de force des thermiques (thermique moyen et panache) selon l'altitude du départ, recalé sur les traces :
+ * kVal pour les pompes de fond de vallée (sous zVal, raccord sur 100 m), puis de kLow à kHigh entre reliefZ.
+ */
+export function strengthGain(z) {
+  const g = clip01((z - PARAM.reliefZ[0]) / (PARAM.reliefZ[1] - PARAM.reliefZ[0])), m = PARAM.kLow + (PARAM.kHigh - PARAM.kLow) * g;
+  const t = clip01((z - (PARAM.zVal - 50)) / 100);
+  return PARAM.kVal * (1 - t) + m * t;
+}
+/** Aplatissement du cycle de la journée : rapport H'/H avec H' = heatRef (H/heatRef)^heatGam (s'applique à w* et à B). */
+export function heatFlat(H) {
+  return H > 0 ? Math.pow(H / PARAM.heatRef, PARAM.heatGam - 1) : 0;
 }
 
 /**
@@ -544,7 +565,7 @@ export function layer(wstar, zi, B, kf, fa, fr, zr) {
   const r2 = Math.max(10, 0.102 * s * (1 - 0.25 * zr) * zi);
   const q = r2 > 600 ? 0.8 : 0.0011 * r2 + 0.14;
   const zp = zr * zi + PARAM.z0Plume, cb = B > 0 ? Math.cbrt(B * fa) : 0;
-  return { wA: Math.max(0, 3 * wbar * (1 - q) / (1 - q * q * q) * kf), RA: 0.75 * r2 * kf * fr,
+  return { wA: Math.max(0, 3 * wbar * (1 - q) / (1 - q * q * q)), RA: 0.75 * r2 * kf * fr,
     wP: cb > 0 ? Math.max(0, PARAM.kPlume * cb / Math.cbrt(zp) * (1 - zr * zr)) : 0, RP: Math.max(25, 0.12 * zp) * fr };
 }
 const NCIR = 3, acc3 = new Float64Array(NCIR);
@@ -594,8 +615,8 @@ export function uncertainty(s, seed, N = 200) {
   for (let k = 0; k < N; k++) {
     const fH = Math.exp(0.25 * n()), fZ = Math.exp(0.15 * n()), fa = Math.exp(0.35 * n()), fr = Math.exp(0.25 * n()), sink = 0.1 * n();
     const fs = Math.exp(0.15 * n());
-    const zi = s.zi * fZ, wst = Math.cbrt(9.81 / 300 * s.H * fH / 1105 * zi);
-    const [v, a, c0, bi] = thermal(wst, zi, s.B * fH, s.kf, fa, fr, sink, s.fw * fs);
+    const zi = s.zi * fZ, hf = heatFlat(s.H * fH), wst = Math.cbrt(9.81 / 300 * s.H * fH * hf / 1105 * zi);
+    const [v, a, c0, bi] = thermal(wst, zi, s.B * fH * hf, s.kf, fa, fr, sink, s.fw * fs * strengthGain(s.z));
     bankCount[bi]++;
     const top = s.zb + zi;
     const ceil = Math.max(s.z, s.cu ? Math.min(s.zl + 250 * n(), top) : s.zb + PARAM.ceilFrac * zi);
@@ -781,8 +802,8 @@ export function computeHour(T, W, idx) {
     if (wind > 9) fw *= Math.max(0.6, 1 - (wind - 9) / 15);           // thermiques hachés par vent fort
     if (L4(S.rain, p) > 0.3) fw *= 0.35;                               // averses
     fwA[p] = fw;
-    const wstar = Math.cbrt(9.81 / 300 * Hreg[p] / 1105 * zi);
-    climb[p] = Math.max(0, thermal(wstar, zi, G_RCP * Q[p], reliefGain(z), 1, 1, 0, fw)[0]);
+    const hf = heatFlat(Hreg[p]), wstar = Math.cbrt(9.81 / 300 * Hreg[p] * hf / 1105 * zi);
+    climb[p] = Math.max(0, thermal(wstar, zi, G_RCP * Q[p] * hf, reliefGain(z), 1, 1, 0, fw * strengthGain(z))[0]);
     if (ceil[p] < z + 150) climb[p] = 0;                               // rien d'exploitable sous 150 m de gain
   }
   lap("thermiques");
@@ -795,7 +816,7 @@ export function computeHour(T, W, idx) {
   const R = Math.round(500 / dx), Bd = 6;
   for (let j = Bd; j < ny - Bd; j++) for (let i = Bd; i < nx - Bd; i++) {
     const p = j * nx + i, v = sm[p];
-    if (v < 0.30 || climb[p] < 0.4) continue;
+    if (v < 0.2 || climb[p] < 0.3) continue;
     let isMax = true;
     for (let dj = -R; dj <= R && isMax; dj++) for (let di = -R; di <= R; di++) if (sm[p + dj * nx + di] > v) { isMax = false; break; }
     if (isMax) cand.push({ i, j, s: v });
@@ -812,7 +833,7 @@ export function computeHour(T, W, idx) {
   // isolées (à plus de 2 km de toute autre), celles des bas reliefs près des terrains (MSM au-dessus de Challes)
   for (const c of cand) {
     if (spots.length >= PARAM.maxSpots + 400) break;
-    if (c.s < 1 || spots.some(s => Math.hypot(s.i - c.i, s.j - c.j) < gapD)) continue;
+    if (c.s < 0.7 || spots.some(s => Math.hypot(s.i - c.i, s.j - c.j) < gapD)) continue;
     spots.push(c);
   }
   // Partage de l'air : la chaleur qui monte en un point de convergence ne nourrit qu'un panache. Quand deux pompes sont
@@ -845,7 +866,9 @@ export function computeHour(T, W, idx) {
     const pfeed = 0.2 + 0.7 * Math.min(1, ci) * (0.3 + 0.7 * prom);
     const psite = pfeed + Math.max(0, 0.92 - pfeed) * PARAM.trigW * trig;
     const prob = Math.min(0.95, Math.max(0.02, u.pdev * psite));
-    return { i: c.i, j: c.j, score: c.s, elev: z, cu: cu[p], depth: cu[p] ? Math.max(0, top[p] - zlA[p]) : 0, conv: ci, convAlone: cidx[p], shared: SH.shared[k], qs: Qs, h: Hreg[p], wu, wv, prob, psite, trig, lid: T.lidF[p], ...u };
+    // ingrédients de la Vz (pour le recalage rapide sur les traces de vol)
+    const ziS = top[p] - zb, diag = { H: Hreg[p], zi: ziS, B: G_RCP * Qs, z, fw: fwA[p] };
+    return { i: c.i, j: c.j, score: c.s, elev: z, cu: cu[p], depth: cu[p] ? Math.max(0, top[p] - zlA[p]) : 0, diag, conv: ci, convAlone: cidx[p], shared: SH.shared[k], qs: Qs, h: Hreg[p], wu, wv, prob, psite, trig, lid: T.lidF[p], ...u };
   });
 
   relativeProb(out, dx);
@@ -1020,12 +1043,12 @@ export function feedAnalysis(T, F, i, j) {
   const paths = starts.map(q => { const pts = []; let c = q, k = 0; while (c >= 0 && k <= fl.it + 1) { pts.push(i0 + (c % w), j0 + Math.floor(c / w)); if (near(c)) break; c = fl.down[c]; k++; } return pts; });
   // rose des vents : vent uniforme imposé dans la fenêtre (direction d'où il vient, force en km/h)
   const z = T.elev[p0], zb = Math.min(z, T.zs[p0]), zi = Math.max(250, F.top[p0] - zb);
-  const wstar = Math.cbrt(9.81 / 300 * F.H[p0] / 1105 * zi), kf = reliefGain(z);
+  const hf = heatFlat(F.H[p0]), wstar = Math.cbrt(9.81 / 300 * F.H[p0] * hf / 1105 * zi), kf = reliefGain(z), sg = strengthGain(z);
   const speeds = [0, 10, 20, 30, 40], dirs = 16, rose = [];
   const vzAt = (Qmax, U) => {
-    let fw = F.fw[p0] || 1;
+    let fw = (F.fw[p0] || 1) * sg;
     if (U > 9) fw *= Math.max(0.6, 1 - (U - 9) / 15);
-    return thermal(wstar, zi, G_RCP * Qmax, kf, 1, 1, 0, fw)[0];
+    return thermal(wstar, zi, G_RCP * Qmax * hf, kf, 1, 1, 0, fw)[0];
   };
   const best = fx => { const Qw = plumeHeat(fx); let m = 0; for (let dj = -4; dj <= 4; dj++) for (let di = -4; di <= 4; di++) { if (di * di + dj * dj > 16) continue; const qi = i - i0 + di, qj = j - j0 + dj; if (qi >= 0 && qj >= 0 && qi < w && qj < h) m = Math.max(m, Qw[qj * w + qi]); } return m; };
   for (let d = 0; d < dirs; d++) {
@@ -1054,8 +1077,8 @@ export function pumpStructure(T, F, i, j) {
   const { nx, ny, dx } = T.meta, p = j * nx + i, S = F.S;
   const spot = F.spots.find(s => s.i === i && s.j === j);
   const z0 = T.elev[p], zb = Math.min(z0, T.zs[p]), zi = Math.max(250, F.top[p] - zb);
-  const H = F.H[p], wstar = Math.cbrt(9.81 / 300 * H / 1105 * zi), kf = reliefGain(z0), fw = F.fw[p] || 1;
-  const Qs = spot ? spot.qs : F.Q[p], B = G_RCP * Qs;
+  const H = F.H[p], hf = heatFlat(H), wstar = Math.cbrt(9.81 / 300 * H * hf / 1105 * zi), kf = reliefGain(z0), fw = (F.fw[p] || 1) * strengthGain(z0);
+  const Qs = spot ? spot.qs : F.Q[p], B = G_RCP * Qs * hf;
   const ceil = spot ? spot.ceil : F.ceil[p];
   const ring = PARAM.ringFrac * 0.44;
   const wAt = (L, r) => {
