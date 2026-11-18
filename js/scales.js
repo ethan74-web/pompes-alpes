@@ -20,8 +20,8 @@ export const SCALES = {
     col: ramp([[1200, hex("#3b82f6")], [1800, hex("#22d3ee")], [2400, hex("#4ade80")], [3000, hex("#facc15")], [3600, hex("#f97316")], [4200, hex("#dc2626")]]) },
   heat: { cap: "Chaleur rendue à l'air par le sol (W/m²)", ticks: [50, 150, 250, 350, 450],
     col: ramp([[50, hex("#5a2412")], [150, hex("#a8401a")], [250, hex("#d95926")], [350, hex("#f0a070")], [450, hex("#fbe3cf")]]) },
-  conv: { cap: "Convergence des brises de pente (indice)", ticks: [0.2, 0.4, 0.6, 0.8, 1],
-    col: ramp([[0.15, hex("#0c4a36")], [0.5, hex("#199e70")], [1, hex("#a9ecd2")]]) },
+  conv: { cap: "Alimentation : chaleur collectée par les brises et le vent (indice)", ticks: [0.25, 0.5, 0.75, 1, 1.25, 1.5],
+    col: ramp([[0.15, hex("#0c4a36")], [0.6, hex("#199e70")], [1.1, hex("#a9ecd2")], [1.5, hex("#ffffff")]]) },
 };
 
 export const css = c => `rgb(${c[0] | 0},${c[1] | 0},${c[2] | 0})`;

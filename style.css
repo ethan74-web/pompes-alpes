@@ -70,6 +70,14 @@ button:hover { border-color: var(--muted); }
 .about .theory:hover { color: var(--ink); }
 .field { image-rendering: auto; }
 .leaflet-marker-icon.wind { background: none; border: 0; pointer-events: none; }
+label.grow { display: flex; min-width: 0; }
+label.grow select { flex: 1; min-width: 0; width: 100%; text-overflow: ellipsis; }
+h3.sub { font-size: 13px; margin: 12px 0 0; color: var(--ink); }
+#rose, #cmpChart, #cmpEmagram { width: 100%; height: auto; margin-top: 10px; display: block; border-radius: 8px; background: var(--surf2); }
+#rose { max-width: 360px; margin-left: auto; margin-right: auto; }
+.cmplegend { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 8px; font-size: 12px; color: var(--ink2); }
+.cmplegend i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 5px; }
+.feedimg { image-rendering: pixelated; }
 @media (max-width: 860px) {
   main { flex-direction: column; }
   #map { flex: none; height: 56vh; }

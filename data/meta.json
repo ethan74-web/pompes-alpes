@@ -1,223 +1,251 @@
 {
- "nx": 756,
- "ny": 830,
+ "nx": 881,
+ "ny": 1022,
  "dx": 150.0,
  "lat0": 45.64,
  "lon0": 6.35,
- "west": 5.62,
- "east": 7.078642257819106,
- "south": 45.080344600631186,
+ "west": 5.38,
+ "east": 7.079819879813005,
+ "south": 44.82133997812659,
  "north": 46.2,
  "places": [
   {
    "name": "Nivolet",
    "lat": 45.62061,
-   "lon": 5.96826,
+   "lon": 5.96751,
    "kind": "peak",
-   "alt": 1535
+   "alt": 1528
   },
   {
    "name": "Revard",
-   "lat": 45.68401,
-   "lon": 5.97598,
+   "lat": 45.68267,
+   "lon": 5.97523,
    "kind": "peak",
-   "alt": 1531
+   "alt": 1530
   },
   {
    "name": "Mont Peney",
    "lat": 45.59903,
-   "lon": 5.98948,
+   "lon": 5.99066,
    "kind": "peak",
-   "alt": 1347
+   "alt": 1346
   },
   {
    "name": "Margériaz",
-   "lat": 45.6341,
-   "lon": 6.03386,
+   "lat": 45.63545,
+   "lon": 6.03504,
    "kind": "peak",
-   "alt": 1817
+   "alt": 1818
   },
   {
    "name": "Colombier",
    "lat": 45.64489,
-   "lon": 6.11876,
+   "lon": 6.11993,
    "kind": "peak",
-   "alt": 1991
+   "alt": 1983
   },
   {
    "name": "Trélod",
    "lat": 45.69211,
-   "lon": 6.19593,
+   "lon": 6.19711,
    "kind": "peak",
-   "alt": 2121
+   "alt": 2127
   },
   {
    "name": "Arcalod",
    "lat": 45.68401,
-   "lon": 6.22873,
+   "lon": 6.22798,
    "kind": "peak",
-   "alt": 2121
+   "alt": 2128
   },
   {
    "name": "Pécloz",
    "lat": 45.6314,
-   "lon": 6.22873,
+   "lon": 6.22991,
    "kind": "peak",
    "alt": 2138
   },
   {
    "name": "Arclusaz",
    "lat": 45.60712,
-   "lon": 6.20558,
+   "lon": 6.20676,
    "kind": "peak",
-   "alt": 1987
+   "alt": 1997
   },
   {
    "name": "Galoppaz",
    "lat": 45.56665,
-   "lon": 6.06859,
+   "lon": 6.06784,
    "kind": "peak",
    "alt": 1637
   },
   {
    "name": "Semnoz",
    "lat": 45.79733,
-   "lon": 6.10525,
+   "lon": 6.1045,
    "kind": "peak",
-   "alt": 1678
+   "alt": 1675
+  },
+  {
+   "name": "Grand Colombier",
+   "lat": 45.9012,
+   "lon": 5.76106,
+   "kind": "peak",
+   "alt": 1501
+  },
+  {
+   "name": "Moucherotte",
+   "lat": 45.14847,
+   "lon": 5.63951,
+   "kind": "peak",
+   "alt": 1863
+  },
+  {
+   "name": "Grand Veymont",
+   "lat": 44.86923,
+   "lon": 5.52567,
+   "kind": "peak",
+   "alt": 2301
+  },
+  {
+   "name": "Taillefer",
+   "lat": 45.0392,
+   "lon": 5.92313,
+   "kind": "peak",
+   "alt": 2822
   },
   {
    "name": "Granier",
    "lat": 45.46548,
-   "lon": 5.92581,
+   "lon": 5.92506,
    "kind": "peak",
-   "alt": 1906
+   "alt": 1898
   },
   {
    "name": "Dent de Crolles",
-   "lat": 45.309,
-   "lon": 5.85442,
+   "lat": 45.31035,
+   "lon": 5.85367,
    "kind": "peak",
-   "alt": 2006
+   "alt": 2008
   },
   {
    "name": "Chamechaude",
-   "lat": 45.28741,
-   "lon": 5.78689,
+   "lat": 45.28876,
+   "lon": 5.78807,
    "kind": "peak",
-   "alt": 2013
+   "alt": 2028
   },
   {
    "name": "Grand Som",
    "lat": 45.3724,
-   "lon": 5.81198,
+   "lon": 5.81316,
    "kind": "peak",
-   "alt": 1959
+   "alt": 1976
   },
   {
    "name": "Charmant Som",
-   "lat": 45.32384,
-   "lon": 5.76374,
+   "lat": 45.32518,
+   "lon": 5.76492,
    "kind": "peak",
-   "alt": 1823
+   "alt": 1824
   },
   {
    "name": "Croix de Chamrousse",
    "lat": 45.12554,
-   "lon": 5.90459,
+   "lon": 5.90384,
    "kind": "peak",
    "alt": 2241
   },
   {
    "name": "Grand Pic de Belledonne",
-   "lat": 45.16735,
-   "lon": 5.98755,
+   "lat": 45.1687,
+   "lon": 5.98873,
    "kind": "peak",
-   "alt": 2862
+   "alt": 2867
   },
   {
    "name": "Parmelan",
-   "lat": 45.94167,
-   "lon": 6.2461,
+   "lat": 45.94302,
+   "lon": 6.24535,
    "kind": "peak",
-   "alt": 1832
+   "alt": 1828
   },
   {
    "name": "Tournette",
-   "lat": 45.82296,
-   "lon": 6.28854,
+   "lat": 45.82701,
+   "lon": 6.28586,
    "kind": "peak",
    "alt": 2297
   },
   {
    "name": "Jallouvre",
-   "lat": 45.99563,
-   "lon": 6.45255,
+   "lat": 45.99968,
+   "lon": 6.46144,
    "kind": "peak",
-   "alt": 2323
+   "alt": 2356
   },
   {
    "name": "Pointe Percée",
    "lat": 45.95516,
-   "lon": 6.55673,
+   "lon": 6.55598,
    "kind": "peak",
-   "alt": 2640
+   "alt": 2676
   },
   {
    "name": "Charvin",
    "lat": 45.80272,
-   "lon": 6.41974,
+   "lon": 6.42092,
    "kind": "peak",
-   "alt": 2342
+   "alt": 2326
   },
   {
    "name": "Pierra Menta",
    "lat": 45.63815,
-   "lon": 6.65128,
+   "lon": 6.65052,
    "kind": "peak",
-   "alt": 2568
+   "alt": 2550
   },
   {
    "name": "Mirantin",
    "lat": 45.68401,
-   "lon": 6.49885,
+   "lon": 6.50003,
    "kind": "peak",
-   "alt": 2407
+   "alt": 2404
   },
   {
    "name": "Buet",
-   "lat": 46.02531,
-   "lon": 6.85194,
+   "lat": 46.02396,
+   "lon": 6.85311,
    "kind": "peak",
-   "alt": 3061
+   "alt": 3057
   },
   {
    "name": "Tenneverge",
    "lat": 46.0941,
-   "lon": 6.88088,
+   "lon": 6.88012,
    "kind": "peak",
-   "alt": 2913
+   "alt": 2911
   },
   {
    "name": "Mont Blanc",
    "lat": 45.8324,
-   "lon": 6.86544,
+   "lon": 6.86469,
    "kind": "peak",
-   "alt": 4769
+   "alt": 4770
   },
   {
    "name": "Aiguille du Midi",
    "lat": 45.87962,
-   "lon": 6.88859,
+   "lon": 6.88784,
    "kind": "peak",
-   "alt": 3681
+   "alt": 3675
   },
   {
    "name": "Aiguille Verte",
    "lat": 45.93492,
-   "lon": 6.96963,
+   "lon": 6.96888,
    "kind": "peak",
-   "alt": 4063
+   "alt": 4055
   },
   {
    "name": "Grenoble",
@@ -231,14 +259,14 @@
    "lat": 45.566,
    "lon": 5.921,
    "kind": "town",
-   "alt": 279
+   "alt": 280
   },
   {
    "name": "Annecy",
    "lat": 45.8992,
    "lon": 6.1294,
    "kind": "town",
-   "alt": 455
+   "alt": 453
   },
   {
    "name": "Albertville",
@@ -252,77 +280,91 @@
    "lat": 45.689,
    "lon": 5.915,
    "kind": "town",
-   "alt": 270
+   "alt": 274
   },
   {
    "name": "Montmélian",
    "lat": 45.503,
    "lon": 6.056,
    "kind": "town",
-   "alt": 293
+   "alt": 289
   },
   {
    "name": "Cluses",
    "lat": 46.06,
    "lon": 6.579,
    "kind": "town",
-   "alt": 486
+   "alt": 487
   },
   {
    "name": "Sallanches",
    "lat": 45.936,
    "lon": 6.631,
    "kind": "town",
-   "alt": 561
+   "alt": 558
   },
   {
    "name": "Chamonix",
    "lat": 45.9237,
    "lon": 6.8694,
    "kind": "town",
-   "alt": 1052
+   "alt": 1046
   },
   {
    "name": "Beaufort",
    "lat": 45.719,
    "lon": 6.573,
    "kind": "town",
-   "alt": 734
+   "alt": 735
   },
   {
    "name": "Allevard",
    "lat": 45.395,
    "lon": 6.075,
    "kind": "town",
-   "alt": 467
+   "alt": 463
   },
   {
    "name": "Samoëns",
    "lat": 46.083,
    "lon": 6.728,
    "kind": "town",
-   "alt": 708
+   "alt": 710
   },
   {
    "name": "La Clusaz",
    "lat": 45.904,
    "lon": 6.423,
    "kind": "town",
-   "alt": 1035
+   "alt": 1034
+  },
+  {
+   "name": "Villard-de-Lans",
+   "lat": 45.0711,
+   "lon": 5.5531,
+   "kind": "town",
+   "alt": 1028
+  },
+  {
+   "name": "La Mure",
+   "lat": 44.903,
+   "lon": 5.788,
+   "kind": "town",
+   "alt": 867
   },
   {
    "name": "Le Châtelard",
    "lat": 45.687,
    "lon": 6.137,
    "kind": "town",
-   "alt": 743
+   "alt": 768
   },
   {
    "name": "Saint-Pierre-de-Chartreuse",
    "lat": 45.343,
    "lon": 5.816,
    "kind": "town",
-   "alt": 899
+   "alt": 887
   },
   {
    "name": "Challes-les-Eaux",
@@ -336,28 +378,28 @@
    "lat": 45.929,
    "lon": 6.1068,
    "kind": "field",
-   "alt": 458
+   "alt": 460
   },
   {
    "name": "Le Versoud",
    "lat": 45.217,
    "lon": 5.85,
    "kind": "field",
-   "alt": 218
+   "alt": 217
   },
   {
    "name": "Albertville (aérodrome)",
    "lat": 45.6275,
    "lon": 6.3297,
    "kind": "field",
-   "alt": 312
+   "alt": 317
   },
   {
    "name": "Sallanches Mont-Blanc",
    "lat": 45.953,
    "lon": 6.639,
    "kind": "field",
-   "alt": 534
+   "alt": 537
   }
  ]
 }
