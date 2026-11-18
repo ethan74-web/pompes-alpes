@@ -1002,3 +1002,6 @@ function startPlay() {
 function stopPlay() { if (st.playing) { clearInterval(st.playing); st.playing = null; $("play").textContent = "▶ Animer"; } }
 
 init().catch(e => setStatus("Erreur : " + e.message, true));
+// page installable et utilisable hors réseau (pas pendant les tests en local)
+if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
+window.addEventListener("offline", () => setStatus("Hors réseau : dernière prévision enregistrée", true));
