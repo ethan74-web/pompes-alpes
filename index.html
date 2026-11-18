@@ -27,6 +27,17 @@
           <label class="grow">Modèle météo <select id="model" class="grow"></select></label>
           <button id="compare" type="button" title="Calculer la journée avec chaque modèle et comparer">Comparer</button>
         </div>
+        <div class="row">
+          <label class="grow">Planeur <select id="glider" class="grow"></select></label>
+          <label>Ballast
+            <select id="ballast">
+              <option value="0">sans</option>
+              <option value="0.1">+10 %</option>
+              <option value="0.2">+20 %</option>
+              <option value="0.3">+30 %</option>
+            </select>
+          </label>
+        </div>
       </section>
 
       <section id="cmpBox" hidden>
@@ -51,6 +62,15 @@
       </section>
 
       <section>
+        <div class="row between">
+          <h2>Terrain</h2>
+          <select id="field" aria-label="Aérodrome"></select>
+        </div>
+        <p id="fieldText" class="summary"></p>
+        <canvas id="fieldChart" width="640" height="190" aria-label="Pompes près du terrain heure par heure"></canvas>
+      </section>
+
+      <section>
         <h2>Carte</h2>
         <div class="chips" id="layers" role="radiogroup" aria-label="Grandeur affichée">
           <button type="button" data-layer="climb" class="on">Vz</button>
@@ -64,8 +84,10 @@
           <label><input type="checkbox" id="showNames" checked> Noms</label>
         </div>
         <div class="probrow">
-          <label for="minProb">Pompes affichées : probabilité ≥ <output id="minProbLabel">30 %</output> <span id="spotCount" class="muted"></span></label>
-          <input type="range" id="minProb" min="0" max="95" step="5" value="30" aria-label="Probabilité minimale des pompes affichées">
+          <label for="minProb">Pompes affichées : fiabilité ≥ <output id="minProbLabel">30 %</output> <span id="spotCount" class="muted"></span></label>
+          <input type="range" id="minProb" min="0" max="95" step="5" value="30" aria-label="Fiabilité minimale des pompes affichées">
+          <button id="exportCup" type="button" class="big">Exporter les pompes du jour (SeeYou, XCSoar)</button>
+          <p class="hint">Fichier de points .cup : les pompes au-dessus du seuil, regroupées sur la journée (10 h – 19 h), avec Vz, plafond, heures et inclinaison dans la description. Vue d'ensemble : seulement les pompes principales (une tous les 7 km environ). Zoomez pour les voir toutes, avec leur zone.</p>
         </div>
         <div class="row">
           <label class="grow">Opacité <input type="range" id="opacity" min="20" max="100" value="72"></label>
@@ -91,14 +113,14 @@
           <p class="hint">Sur la carte : zone d'où vient l'air chaud qui nourrit la pompe (plus c'est clair, plus elle compte) et trajets de l'air près du sol (brises de pente + vent). La rose donne la Vz attendue dans la pompe si le vent près du relief venait de chaque direction, de 0 à 40 km/h (du centre vers l'extérieur) ; le point blanc marque le vent prévu. Comparez avec les balises en temps réel.</p>
         </div>
         <canvas id="emagram" width="640" height="420" aria-label="Profil vertical de température"></canvas>
-        <p class="hint">Vz : ce qu'indique le vario d'un planeur de classe standard qui spirale comme il faut — 35° (76 km/h) dans une pompe large, 45° (82 km/h) ou 55° (91 km/h) dans une pompe étroite —, moyenne entre 30 et 70 % de la hauteur de la couche convective. Les fourchettes couvrent 95 % des cas simulés.</p>
+        <p class="hint">Vz : ce qu'indique le vario du planeur choisi (polaire approchée) qui spirale comme il faut — 35° dans une pompe large, 45° ou 55° dans une pompe étroite, à une vitesse adaptée —, moyenne entre 30 et 70 % de la hauteur de la couche convective. Les fourchettes couvrent 95 % des cas simulés.</p>
         <p class="hint">Trait plein : température de l'air · tirets bleus : point de rosée · tirets orange : particule partant du sol · bande orange : couche brassée par les thermiques. Le sommet est l'altitude où la particule, qui se mélange peu à peu à l'air ambiant, n'est plus plus légère que lui : un couvercle d'inversion l'arrête.</p>
       </section>
 
       <section class="about">
         <h2>Comment lire cette carte</h2>
         <p>Chaque heure, le site calcule l'énergie reçue par chaque pente de 150 m (soleil, ombres portées, nuages) et la chaleur que le sol rend à l'air. Les brises de pente et le vent, ajusté au relief, ramassent cette chaleur et la concentrent là où ils convergent : ce sont les <b>pompes</b>, plus fortes et plus étroites que les thermiques ordinaires autour.</p>
-        <p>L'<b>ellipse</b> est la zone où l'on a 95 % de chances de trouver le thermique en spiralant ; elle s'allonge dans le sens où le modèle hésite (le long d'une crête, sous le vent). La <b>probabilité</b> est celle que la pompe soit là et exploitable (au moins 0,5 m/s au vario et 300 m de gain) ; le curseur n'affiche que les pompes au-dessus du seuil choisi. Cliquez sur une pompe pour la voir en 3D (vitesses selon l'altitude, inclinaison conseillée, turbulence) ; au-dessus de 3 m/s, vous voyez aussi d'où vient son air et ce qu'elle devient selon le vent.</p>
+        <p>L'<b>ellipse</b> est la zone où l'on a 95 % de chances de trouver le thermique en spiralant ; elle s'allonge dans le sens où le modèle hésite (le long d'une crête, sous le vent). La <b>fiabilité</b> classe chaque pompe parmi ses voisines à moins de 15 km (alimentation, relief qui fixe le déclenchement), multipliée par la part des cas simulés où elle est exploitable (au moins 0,5 m/s au vario et 300 m de gain) : chaque secteur garde ses pompes les plus sûres, et une journée faible reste faible. Ce n'est pas encore une fréquence mesurée : elle sera recalée sur des traces de vol. Le curseur n'affiche que les pompes au-dessus du seuil choisi. Cliquez sur une pompe pour la voir en 3D (vitesses selon l'altitude, inclinaison conseillée, turbulence) ; au-dessus de 3 m/s, vous voyez aussi d'où vient son air et ce qu'elle devient selon le vent.</p>
         <p class="warn">Modèle expérimental, recalé sur un seul jour de vol pour l'instant : ordres de grandeur, pas une garantie. Il ne remplace ni un briefing météo ni votre jugement en vol.</p>
         <p class="credits">Météo : <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Relief : SRTM (NASA). Fonds : © OpenStreetMap, OpenTopoMap.</p>
         <a class="theory" href="theorie.html">Le modèle en détail</a>

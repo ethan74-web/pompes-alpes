@@ -1,5 +1,5 @@
 // Calcul en arrière-plan : la page reste fluide pendant que les heures de la journée se calculent.
-import { computeHour, feedAnalysis, loadTerrain, pointSounding, pumpStructure, windAt } from "./model.js";
+import { computeHour, feedAnalysis, loadTerrain, pointSounding, polarOf, pumpStructure, setPolar, windAt } from "./model.js";
 import { SCALES } from "./scales.js";
 import { fetchRange, hourIndex, MODELS } from "./weather.js";
 
@@ -72,9 +72,20 @@ async function handle(m) {
 }
 
 // ---------------------------------------------------------------- journée
+let gliderKey = "std/0";
+function useGlider(g) {
+  const key = g ? `${g.id}/${g.ballast}` : "std/0";
+  if (key === gliderKey) return;
+  gliderKey = key;
+  const P = polarOf(g ? g.id : "std", g ? g.ballast : 0);
+  setPolar(P.a, P.b, P.vm);
+  for (const h of pool.helpers) h.postMessage({ type: "polar", a: P.a, b: P.b, vm: P.vm });
+}
+
 async function day(m) {
   cur.token = m.token; cur.pending = [];
   cancelQueued();
+  useGlider(m.glider);
   const W = await fetchRange(T.meta, m.start, m.end, m.model, DATA, s => post({ type: "wait", token: m.token, seconds: s }));
   if (m.token !== cur.token) return;
   if (hourIndex(W, m.date, 12) < 0) throw new Error("pas de données pour cette date");

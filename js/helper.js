@@ -1,5 +1,5 @@
 // Calcul d'une heure dans un fil d'exécution annexe (plusieurs heures en parallèle sur les processeurs multicœurs).
-import { computeHour, loadTerrain } from "./model.js";
+import { computeHour, loadTerrain, setPolar } from "./model.js";
 
 let T = null, W = null;
 self.onmessage = async e => {
@@ -7,6 +7,7 @@ self.onmessage = async e => {
   try {
     if (m.type === "init") { T = await loadTerrain(m.base); self.postMessage({ type: "ready" }); }
     else if (m.type === "weather") W = m.W;
+    else if (m.type === "polar") setPolar(m.a, m.b, m.vm);
     else if (m.type === "hour") {
       const F = computeHour(T, W, m.idx);
       const fl = F.flow;

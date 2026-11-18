@@ -31,6 +31,7 @@ const DI = [1, 1, 0, -1, -1, -1, 0, 1], DJ = [0, -1, -1, -1, 0, 1, 1, 1];
 export const PARAM = {
   bankDeg: 45, vKmh: 90,    // spirale du planeur
   polarA: 2.38e-5, polarB: 8.02,   // polaire d'un planeur de classe standard : chute = a V³ + b n²/V
+  vMinKmh: 72,              // vitesse de spirale de base (km/h) d'un classe standard sans ballast ; V = vMin √n
   heights: [0.3, 0.5, 0.7], // hauteurs relatives dans la couche convective où l'on spirale
   vzMin: 0.5, gainMin: 300, // « exploitable » : Vz d'au moins 0,5 m/s et 300 m de gain possible
   kField: 1.2,              // thermique moyen en montagne / thermique moyen en plaine (Allen)
@@ -59,19 +60,48 @@ export const PARAM = {
   catchFrac: 0.4,           // bassin d'une pompe le long des convergences : rayon = catchFrac · zi ...
   catchMax: 1500,           // ... au plus catchMax (m)
   catchGain: 1.35,          // pompe isolée : même chaleur, en moyenne, qu'avec le noyau de 600 m recalé le 8/07
-  ringFrac: 0.4,           // part du débit montant qui redescend en anneau autour du thermique (vue 3D, inclinaison)
+  relR: 15000,              // fiabilité relative : rang parmi les pompes à moins de 15 km ...
+  relProb: [0.25, 0.9],     // ... ramené entre 25 % (la moins sûre du secteur) et 90 % (la plus sûre), × P_dév
+  ringFrac: 0.4,          // part du débit montant qui redescend en anneau autour du thermique (vue 3D, inclinaison)
 };
 const V = PARAM.vKmh / 3.6, BANK = PARAM.bankDeg * Math.PI / 180;
 export const R_TURN = V * V / (9.81 * Math.tan(BANK));                                 // 63,7 m
 export const SINK = PARAM.polarA * V ** 3 + PARAM.polarB / Math.cos(BANK) ** 2 / V;     // 1,01 m/s
 // Spirales possibles : inclinaison φ, vitesse 1,05 x vitesse de chute minimale x √n (n = 1/cos φ, facteur de charge),
 // rayon V²/(g tan φ), chute a V³ + b n²/V. 35° : 76 km/h, 66 m, 0,79 m/s ; 45° : 82 km/h, 53 m, 0,99 m/s ; 55° : 91 km/h, 46 m, 1,35 m/s.
-const VMS = Math.pow(PARAM.polarB / (3 * PARAM.polarA), 0.25);
+let VMS = PARAM.vMinKmh / 3.6;
 export function circle(deg) {
-  const ph = deg * Math.PI / 180, n = 1 / Math.cos(ph), V = 1.05 * VMS * Math.sqrt(n);
+  const ph = deg * Math.PI / 180, n = 1 / Math.cos(ph), V = VMS * Math.sqrt(n);
   return { deg, V, R: V * V / (9.81 * Math.tan(ph)), sink: PARAM.polarA * V ** 3 + PARAM.polarB * n * n / V };
 }
 export const CIRCLES = [35, 45, 55].map(circle);
+
+/**
+ * Planeurs : polaire s = a V³ + b n²/V ajustée sur deux points en ligne droite (vitesse km/h, chute m/s), à la charge
+ * alaire de référence. Valeurs approchées des polaires publiées. Avec du ballast (masse × k), vitesses et chutes sont
+ * multipliées par √k : a devient a/k et b devient b k.
+ */
+// vm : vitesse de chute minimale réelle (km/h, sans ballast), base de la vitesse en spirale V = vm √n
+export const GLIDERS = [
+  { id: "std", name: "Classe standard (LS8, Discus 2)", p: [[75, 0.60], [100, 0.80]], vm: PARAM.vMinKmh },
+  { id: "club", name: "Classe club (LS4, Astir, DG-100)", p: [[75, 0.62], [110, 0.85]], vm: PARAM.vMinKmh - 3 },
+  { id: "school", name: "Biplace école (ASK 21)", p: [[75, 0.67], [110, 1.05]], vm: PARAM.vMinKmh - 5 },
+  { id: "15m", name: "15 m (ASW 27, Ventus 2a)", p: [[78, 0.53], [110, 0.68]], vm: PARAM.vMinKmh + 2 },
+  { id: "18m", name: "18 m (LS8-18, ASG 29)", p: [[78, 0.48], [110, 0.60]], vm: PARAM.vMinKmh + 3 },
+  { id: "duo", name: "Biplace performance (Duo Discus, Arcus)", p: [[80, 0.55], [110, 0.68]], vm: PARAM.vMinKmh + 5 },
+];
+export function polarOf(id, ballast = 0) {
+  const g = GLIDERS.find(x => x.id === id) || GLIDERS[0];
+  const [[v1, s1], [v2, s2]] = g.p.map(([v, s]) => [v / 3.6, s]);
+  // s = a v³ + b / v en deux points
+  const a = (s1 * v1 - s2 * v2) / (v1 ** 4 - v2 ** 4), b = s1 * v1 - a * v1 ** 4, k = 1 + ballast;
+  return { a: a / k, b: b * k, vm: g.vm / 3.6 * Math.sqrt(k) };
+}
+/** Change de planeur : polaire et spirales possibles (la carte doit être recalculée). */
+export function setPolar(a, b, vm) {
+  PARAM.polarA = a; PARAM.polarB = b; VMS = vm;
+  [35, 45, 55].forEach((d, k) => { CIRCLES[k] = circle(d); });
+}
 
 // Téléchargement avec reprises : certains antivirus coupent les connexions locales en cours de transfert.
 async function get(url, kind = "arrayBuffer", tries = 5) {
@@ -798,6 +828,7 @@ export function computeHour(T, W, idx) {
     return { i: c.i, j: c.j, score: c.s, elev: z, cu: cu[p], conv: ci, convAlone: cidx[p], shared: SH.shared[k], qs: Qs, h: Hreg[p], wu, wv, prob, psite, trig, lid: T.lidF[p], ...u };
   });
 
+  relativeProb(out, dx);
   lap("pompes");
   // ---- statistiques de l'heure
   const best = out.slice().sort((a, b) => b.vz - a.vz).slice(0, 12);
@@ -822,8 +853,47 @@ export function computeHour(T, W, idx) {
     wind25: meanWind(S, 25), challes: [cu15, cv15],
     hMean: nv ? hm / nv : 0,
     snowLine: S.snowLine, ms,
+    fields: fieldSummary(T, S, out),
   };
   return { H: Hreg, Hloc, top, ceil, cu, climb, conv: cidx, Q, zl: zlA, fw: fwA, ua, va, flow: fl, spots: out, stats, S };
+}
+
+/**
+ * Fiabilité relative. Les jours forts, presque tous les tirages donnent un thermique exploitable (P_dév ≈ 1) et l'ancienne
+ * probabilité ne reflétait plus que le facteur de site, hypothétique : 600 pompes au-dessus de 75 %. On classe donc chaque
+ * pompe parmi ses voisines à moins de relR (rang du facteur de site, puis de la Vz), avec un a priori de 2 pompes moyennes
+ * pour les secteurs presque vides, et P = P_dév × (relProb[0] + (relProb[1] - relProb[0]) × rang).
+ * Chaque secteur garde ses pompes les plus sûres ; une journée faible reste faible par P_dév. À recaler sur les traces IGC.
+ */
+function relativeProb(spots, dx) {
+  const R2 = (PARAM.relR / dx) ** 2, [a, b] = PARAM.relProb, k0 = 2;
+  for (const s of spots) {
+    let below = 0, tot = 0;
+    for (const o of spots) {
+      if ((o.i - s.i) ** 2 + (o.j - s.j) ** 2 > R2 || o === s) continue;
+      tot++;
+      if (o.psite < s.psite || (o.psite === s.psite && o.vz < s.vz)) below++;
+    }
+    s.rank = (below + 0.5 * k0) / (tot + k0);
+    s.nSector = tot + 1;
+    s.pabs = s.prob;
+  }
+  for (const s of spots) s.prob = Math.min(0.95, Math.max(0.02, s.pdev * (a + (b - a) * s.rank)));
+}
+
+/** Pour chaque aérodrome : meilleure pompe à moins de 10 km, pompe basse la plus proche, plafond local, vent au sol et vers 1 500 m. */
+function fieldSummary(T, S, spots) {
+  const { meta } = T, { nx, ny, dx } = meta;
+  return meta.places.filter(f => f.kind === "field").map(f => {
+    const [ci, cj] = latLonCell(meta, f.lat, f.lon), i = Math.max(0, Math.min(nx - 1, ci)), j = Math.max(0, Math.min(ny - 1, cj)), p = j * nx + i, z = T.elev[p];
+    const near = spots.map(s => ({ s, d: Math.hypot(s.i - i, s.j - j) * dx })).filter(x => x.d <= 10000 && x.s.prob >= 0.4);
+    const pick = x => x && { vz: x.s.vz, prob: x.s.prob, ceil: x.s.ceil, d: x.d, elev: x.s.elev, bank: x.s.bank, az: Math.atan2(x.s.i - i, j - x.s.j) * 180 / Math.PI };
+    const best = near.reduce((m, x) => (!m || x.s.vz * x.s.prob > m.s.vz * m.s.prob ? x : m), null);
+    const low = near.filter(x => x.s.elev < z + 700 && x.d <= 6000).reduce((m, x) => (!m || x.d < m.d ? x : m), null);
+    const ceils = near.map(x => x.s.ceil).sort((x, y) => x - y);
+    return { name: f.name, z, best: pick(best), low: pick(low), ceil: ceils.length ? ceils[ceils.length >> 1] : 0, n: near.length,
+      w10: [lerp4(T, S.u10, p), lerp4(T, S.v10, p)], w15: [prof4(T, S.uu, p, 15), prof4(T, S.vv, p, 15)] };
+  });
 }
 
 function meanWind(S, l) {

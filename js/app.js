@@ -3,6 +3,7 @@
 import { SCALES, css } from "./scales.js";
 import { addDays, isoDate, MODELS, DEFAULT_MODEL } from "./weather.js";
 import { drawBank, drawProfile, pause3D, pumpText, showPump3D } from "./pump3d.js";
+import { GLIDERS } from "./model.js";
 
 const $ = id => document.getElementById(id);
 const H0 = 7, H1 = 21;
@@ -42,6 +43,16 @@ async function init() {
   const sel = $("model");
   for (const m of MODELS) { const o = document.createElement("option"); o.value = m.id; o.textContent = m.name; sel.appendChild(o); }
   sel.value = st.model;
+  const gs = $("glider");
+  for (const g of GLIDERS) { const o = document.createElement("option"); o.value = g.id; o.textContent = g.name; gs.appendChild(o); }
+  if (GLIDERS.some(g => g.id === store.get("glider"))) gs.value = store.get("glider");
+  if (["0", "0.1", "0.2", "0.3"].includes(store.get("ballast"))) $("ballast").value = store.get("ballast");
+  const regl = () => {
+    store.set("glider", gs.value); store.set("ballast", $("ballast").value);
+    st.dayScores = new Map(); paintDays();
+    if (st.date || st.wanted) { const d = st.date || st.wanted; selectDate(d, !(st.week && st.week.includes(d))); }
+  };
+  gs.addEventListener("change", regl); $("ballast").addEventListener("change", regl);
   worker = new Worker(new URL("./worker.js", import.meta.url), { type: "module" });
   worker.onmessage = e => onWorker(e.data);
   worker.onerror = e => setStatus("Erreur du calcul : " + (e.message || "navigateur trop ancien ?"), true);
@@ -89,7 +100,17 @@ function onReady(meta) {
   if (saved >= 0 && saved <= 95 && store.get("minProb") != null) $("minProb").value = saved;
   $("minProbLabel").textContent = $("minProb").value + " %";
   $("minProb").addEventListener("input", e => { $("minProbLabel").textContent = e.target.value + " %"; store.set("minProb", e.target.value); drawSpots(); });
+  const fsel = $("field"), fields = meta.places.filter(p => p.kind === "field");
+  for (const f of fields) { const o = document.createElement("option"); o.value = f.name; o.textContent = f.name; fsel.appendChild(o); }
+  fsel.value = fields.some(f => f.name === store.get("field")) ? store.get("field") : (fields.find(f => /Challes/.test(f.name)) || fields[0] || {}).name;
+  fsel.addEventListener("change", () => { store.set("field", fsel.value); drawField(); });
+  $("fieldChart").addEventListener("click", e => {
+    const r = e.target.getBoundingClientRect();
+    st.hour = Math.min(H1, Math.max(H0, Math.floor(H0 + (e.clientX - r.left) / r.width * (H1 - H0 + 1))));
+    $("hour").value = st.hour; stopPlay(); render();
+  });
   $("open3d").addEventListener("click", open3D);
+  $("exportCup").addEventListener("click", exportCup);
   $("pumpClose").addEventListener("click", close3D);
   $("pumpWin").addEventListener("click", e => { if (e.target === $("pumpWin")) close3D(); });
   document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("pumpWin").hidden) close3D(); });
@@ -146,7 +167,7 @@ function onWorker(m) {
   } else if (m.type === "hour") {
     st.hours.set(m.h, { stats: m.stats, spots: m.spots });
     if (m.h === st.hour) render();
-    drawDayChart();
+    drawDayChart(); drawField();
     setStatus(`Calcul ${st.hours.size}/${H1 - H0 + 1}…`);
   } else if (m.type === "dayDone") {
     st.done = true;
@@ -211,7 +232,7 @@ function selectDate(date, custom) {
   const inWeek = st.week && st.week.includes(date) && !custom;
   setStatus("Récupération des données du " + labelDate(date) + "…");
   clearFeed();
-  worker.postMessage({ type: "day", token: my, date, hour: st.hour, model: st.model, start: inWeek ? st.weekRange[0] : date, end: inWeek ? st.weekRange[1] : date });
+  worker.postMessage({ type: "day", token: my, date, hour: st.hour, model: st.model, glider: { id: $("glider").value, ballast: +$("ballast").value }, start: inWeek ? st.weekRange[0] : date, end: inWeek ? st.weekRange[1] : date });
 }
 
 function labelDate(d) {
@@ -227,7 +248,7 @@ function render() {
   worker.postMessage({ type: "render", token: st.token, h: st.hour, layer: st.layer });
   drawSpots();
   if ($("showNames").checked) namesLayer.addTo(map); else map.removeLayer(namesLayer);
-  drawLegend(); writeSummary(X.stats);
+  drawLegend(); writeSummary(X.stats); drawField();
   if (st.point) askPoint(st.point, true, st.feed, st.pump);
 }
 
@@ -302,15 +323,25 @@ function drawSpots() {
   const minP = +$("minProb").value / 100;
   const rf = Math.min(1.2, Math.max(0.5, Math.pow(2, map.getZoom() - 10.5)));
   const r = { renderer: spotRenderer };
+  // vue d'ensemble : pompes principales seulement (les plus sûres et fortes, une tous les ~5 km), sans zone
+  const overview = map.getZoom() < 10.75;
+  let list = X.spots.filter(s => s.prob >= minP);
+  if (overview) {
+    const keep = [], R = 7000 / 150;
+    for (const s of list.slice().sort((a, b) => b.prob * Math.max(0.3, b.vz) - a.prob * Math.max(0.3, a.vz))) {
+      if (keep.some(k => Math.hypot(k.i - s.i, k.j - s.j) < R)) continue;
+      keep.push(s);
+    }
+    list = keep;
+  }
   let shown = 0;
-  // les plus probables dessinées en dernier (au-dessus)
-  for (const s of X.spots.slice().sort((a, b) => a.prob - b.prob)) {
-    if (s.prob < minP) continue;
+  // les plus sûres dessinées en dernier (au-dessus)
+  for (const s of list.sort((a, b) => a.prob - b.prob)) {
     shown++;
     const [lat, lon] = cellCenter(s.i, s.j);
     const col = css(SCALES.climb.col(s.vz));
     const [clat, clon] = offset(lat, lon, s.ex, s.ey);
-    const zone = L.polygon(ellipse(clat, clon, s.ea, s.eb, s.eang), { ...r, color: col, weight: 1.6, opacity: 0.95, fillColor: col,
+    const zone = overview ? null : L.polygon(ellipse(clat, clon, s.ea, s.eb, s.eang), { ...r, color: col, weight: 1.6, opacity: 0.95, fillColor: col,
       fillOpacity: 0.10 + 0.30 * s.prob, dashArray: s.prob < 0.5 ? "4 4" : null });
     const [tlat, tlon] = offset(lat, lon, s.tx, s.ty);
     if (Math.hypot(s.tx, s.ty) > 300) spotsLayer.addLayer(L.polyline([[lat, lon], [tlat, tlon]], { ...r, color: "#0b0d0e", weight: 3.5, opacity: 0.7, interactive: false }));
@@ -318,7 +349,7 @@ function drawSpots() {
     const dot = L.circleMarker([lat, lon], { ...r, radius: rf * (3 + 1.2 * Math.min(5, Math.max(0, s.vz))), color: "#0b0d0e", weight: 1.3, fillColor: col, fillOpacity: 1 });
     const w = Math.hypot(s.wu, s.wv);
     const tip = `<b>Pompe : Vz +${fr(Math.max(0, s.vz))} m/s</b> <span class="muted">(95 % : ${fr(Math.max(0, s.vzLo))} à ${fr(s.vzHi)})</span>`
-      + `<br>probabilité qu'elle soit exploitable : <b>${pct(s.prob)}</b>`
+      + `<br>fiabilité : <b>${pct(s.prob)}</b> <span class="muted">(${s.nSector > 3 ? `${s.rank >= 0.9 ? "parmi les 10 % les plus sûres" : s.rank >= 0.7 ? "parmi les 30 % les plus sûres" : s.rank >= 0.4 ? "dans la moyenne" : "parmi les moins sûres"} des ${s.nSector} pompes du secteur` : "secteur presque vide"})</span>`
       + `<br>plafond ${km(s.ceil)} m <span class="muted">(${km(s.ceilLo)} à ${km(s.ceilHi)})</span> · ${s.cu ? "cumulus" : "thermique bleu"}`
       + `<br>spirale vers ${s.bank}°${s.bank >= 55 ? " : pompe étroite, serrer" : s.bank <= 35 ? " : pompe large" : ""}`
       + `<br>départ vers ${km(s.elev)} m · vent ${Math.round(w * 3.6)} km/h ${du(windFrom(s.wu, s.wv))}`
@@ -326,13 +357,89 @@ function drawSpots() {
       + (s.shared > 0.1 ? `<br>air partagé avec une voisine : ${Math.round(s.shared * 100)} % de son bassin` : "")
       + (s.lid > 0.5 ? `<br><span class="muted">sous le couvercle de l'air de vallée</span>` : "")
       + `<br><span class="muted">cliquer : vue en 3D${s.vz >= 3 ? ", d'où vient son air, effet du vent" : ""}</span>`;
-    for (const l of [zone, dot]) {
+    for (const l of zone ? [zone, dot] : [dot]) {
       l.bindTooltip(tip, { className: "spot", direction: "top", sticky: l === zone });
       l.on("click", e => { L.DomEvent.stopPropagation(e); askPoint(L.latLng(lat, lon), false, s.vz >= 3, true); });
       spotsLayer.addLayer(l);
     }
   }
-  $("spotCount").textContent = `(${shown} sur ${X.spots.length})`;
+  $("spotCount").textContent = overview ? `(${shown} principales, ${X.spots.filter(s => s.prob >= minP).length} en zoomant)` : `(${shown} sur ${X.spots.length})`;
+}
+
+// ---------------------------------------------------------------- export des pompes du jour (.cup : SeeYou, XCSoar)
+function exportCup() {
+  if (!st.date || !st.hours.size) return;
+  const minP = +$("minProb").value / 100, R = 800 / 150, C = [];
+  for (let h = 10; h <= 18; h++) {
+    const X = st.hours.get(h); if (!X) continue;
+    for (const s of X.spots) {
+      if (s.prob < minP || s.vz < 0.8) continue;
+      let c = C.find(c => Math.hypot(c.i - s.i, c.j - s.j) <= R);
+      if (!c) { c = { i: s.i, j: s.j, elev: s.elev, hours: [], vz: 0, ceil: 0, p: 0, bank: s.bank, score: 0 }; C.push(c); }
+      if (c.hours.includes(h)) continue;
+      c.hours.push(h); c.p += s.prob; c.score += s.prob * s.vz;
+      if (s.vz > c.vz) { c.vz = s.vz; c.bank = s.bank; }
+      c.ceil = Math.max(c.ceil, s.ceil);
+    }
+  }
+  const keep = C.filter(c => c.hours.length >= 2).sort((a, b) => b.score - a.score).slice(0, 400);
+  const dm = (x, w) => { const a = Math.abs(x), d = Math.floor(a), m = (a - d) * 60; return String(d).padStart(w, "0") + m.toFixed(3).padStart(6, "0"); };
+  const lines = ["name,code,country,lat,lon,elev,style,rwdir,rwlen,freq,desc"];
+  keep.forEach((c, k) => {
+    const [lat, lon] = cellCenter(c.i, c.j), h0 = Math.min(...c.hours), h1 = Math.max(...c.hours) + 1;
+    const name = `P${fr(c.vz).replace(",", ".")} ${h0}-${h1}h`;
+    const desc = `Vz ${fr(c.vz)} m/s, plafond ${km(c.ceil)} m, fiabilite ${Math.round(100 * c.p / c.hours.length)} %, ${h0}-${h1} h, spirale ${c.bank} deg (prevision du ${st.date})`;
+    lines.push(`"${name}","P${String(k + 1).padStart(3, "0")}",FR,${dm(lat, 2)}${lat >= 0 ? "N" : "S"},${dm(lon, 3)}${lon >= 0 ? "E" : "W"},${Math.round(c.elev)}m,1,,,,"${desc}"`);
+  });
+  const blob = new Blob([lines.join("\r\n") + "\r\n"], { type: "text/plain" }), a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = `pompes-${st.date}.cup`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  setStatus(`${keep.length} pompes exportées (fiabilité ≥ ${$("minProb").value} %, présentes au moins 2 h entre 10 h et 19 h).`);
+}
+
+// ---------------------------------------------------------------- terrain choisi : pompes proches heure par heure
+const dirFrom = (u, v) => (Math.atan2(-u, -v) * 180 / Math.PI + 360) % 360;
+function drawField() {
+  const name = $("field").value;
+  const get = h => { const X = st.hours.get(h); return X && X.stats.fields ? X.stats.fields.find(f => f.name === name) : null; };
+  const F = get(st.hour), short = name.replace(/ \(.*\)/, "");
+  const side = d => { const c = cardinal((d + 360) % 360); return c === "est" || c === "ouest" ? "à l'" + c : "au " + c; };
+  const where = (x, what) => `${what} à ${fr(x.d / 1000)} km${x.d < 400 ? "" : " " + side(x.az)}`;
+  if (!F) { $("fieldText").textContent = st.hours.size ? "" : "Calcul en cours…"; }
+  else {
+    const w10 = Math.hypot(...F.w10), w15 = Math.hypot(...F.w15), out = [];
+    out.push(`<b>${short} à ${st.hour} h</b>`);
+    if (F.best) out.push(`${where(F.best, "Meilleure pompe")} : <b>+${fr(Math.max(0, F.best.vz))} m/s</b>, plafond ${km(F.best.ceil)} m, fiabilité ${pct(F.best.prob)}.`);
+    else out.push("Pas de pompe sûre à moins de 10 km.");
+    if (F.low) out.push(`${where(F.low, "Première pompe basse")} : +${fr(Math.max(0, F.low.vz))} m/s, départ vers ${km(F.low.elev)} m, ${F.low.bank}°.`);
+    out.push(`Vent au sol ${Math.round(w10 * 3.6)} km/h ${w10 > 0.5 ? du(dirFrom(...F.w10)) : ""} ; vers 1 500 m ${Math.round(w15 * 3.6)} km/h ${w15 > 0.5 ? du(dirFrom(...F.w15)) : ""}.`);
+    const ok = [];
+    for (let h = H0; h <= H1; h++) { const G = get(h); if (G && G.best && G.best.vz >= 1.5) ok.push(h); }
+    if (ok.length) out.push(`Thermiques exploitables près du terrain de <b>${ok[0]} h à ${ok[ok.length - 1] + 1} h</b> (pompe ≥ 1,5 m/s, fiabilité ≥ 40 %, à moins de 10 km).`);
+    $("fieldText").innerHTML = out.join(" ");
+  }
+  const c = $("fieldChart"), g = c.getContext("2d"), Wc = c.width, Hc = c.height, cs = getComputedStyle(document.documentElement);
+  g.clearRect(0, 0, Wc, Hc);
+  const n = H1 - H0 + 1, bw = Wc / n, base = Hc - 26, vmax = 5;
+  g.font = "600 15px system-ui, sans-serif"; g.textAlign = "center";
+  for (let h = H0; h <= H1; h++) {
+    const x = (h - H0) * bw, G = get(h);
+    if (h === st.hour) { g.fillStyle = "rgba(249,115,22,.16)"; g.fillRect(x, 0, bw, Hc); }
+    if (G && G.best) {
+      const v = Math.max(0, G.best.vz), hh = Math.min(1, v / vmax) * (base - 30);
+      g.fillStyle = css(SCALES.climb.col(v)); g.globalAlpha = 0.35 + 0.65 * G.best.prob;
+      g.beginPath(); g.roundRect(x + 6, base - Math.max(2, hh), bw - 12, Math.max(2, hh), [4, 4, 0, 0]); g.fill(); g.globalAlpha = 1;
+    }
+    if (G && G.low) {
+      const v = Math.max(0, G.low.vz), y = base - Math.min(1, v / vmax) * (base - 30);
+      g.fillStyle = "#fff"; g.strokeStyle = "#0b0d0e"; g.lineWidth = 2; g.beginPath(); g.arc(x + bw / 2, y, 5, 0, 2 * Math.PI); g.fill(); g.stroke();
+    }
+    g.fillStyle = h === st.hour ? cs.getPropertyValue("--fg") : cs.getPropertyValue("--muted");
+    g.fillText(h % 2 ? String(h) : "", x + bw / 2, Hc - 6);
+  }
+  g.fillStyle = cs.getPropertyValue("--muted"); g.textAlign = "left"; g.font = "14px system-ui, sans-serif";
+  g.fillText("barres : meilleure pompe à moins de 10 km (Vz, pâle si peu sûre) · points : première pompe basse", 8, 16);
 }
 
 function drawLegend() {
@@ -342,7 +449,7 @@ function drawLegend() {
   const fmt = v => st.layer === "climb" || st.layer === "conv" ? fr(v, v % 1 ? (v * 4 % 1 ? 2 : 1) : 0) : String(v);
   $("legend").innerHTML = `<div class="cap">${sc.cap}</div><div class="bar" style="background:linear-gradient(90deg,${stops.join(",")})"></div>
     <div class="ticks">${t.map(v => `<span>${fmt(v)}</span>`).join("")}</div>
-    <div class="spots"><span class="ell"></span> pompe : zone où la trouver à 95 % (pleine si probabilité ≥ 50 %, tiretée sinon)
+    <div class="spots"><span class="ell"></span> pompe : zone où la trouver à 95 % (pleine si fiabilité ≥ 50 %, tiretée sinon ; affichée au zoom)
     · point : départ au sol · trait : dérive jusqu'au plafond · flèches blanches : vent dans la couche convective ; au zoom, flèches vertes : air près du relief (brises + vent)</div>`;
 }
 
@@ -375,7 +482,7 @@ function writeSummary(s) {
   } else {
     const rng = s.ceilHi - s.ceilLo >= 200 ? `<b>${km(s.ceilLo)} m</b> sur les premiers reliefs à <b>${km(s.ceilHi)} m</b> sur les plus hauts` : `vers <b>${km(s.ceilHi)} m</b>`;
     const sky = s.cuFrac > 0.6 ? `cumulus, base de ${rng}` : s.cuFrac > 0.2 ? `quelques cumulus, plafond de ${rng}` : `thermiques bleus, plafond de ${rng}`;
-    $("summary").innerHTML = `<b>${s.nSpots} pompes</b> à plus de 50 % de chances · Vz typique <b>+${fr(s.spotClimb)} m/s</b> au vario dans les meilleures · ${sky}`;
+    $("summary").innerHTML = `<b>${s.nSpots} pompes</b> fiables à plus de 50 % · Vz typique <b>+${fr(s.spotClimb)} m/s</b> au vario dans les meilleures · ${sky}`;
   }
   const fl = [];
   if (s.rain > 0.3) fl.push("averses prévues");
