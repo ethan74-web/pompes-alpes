@@ -100,6 +100,8 @@ def fetch(pts, start, end, host):
             print("  échec", start, end, e, msg, file=sys.stderr)
             if b"daily" in msg.lower():
                 raise SystemExit("quota quotidien Open-Meteo atteint : reprise au prochain passage")
+            if b"hourly" in msg.lower():
+                raise SystemExit("limite horaire Open-Meteo (5 000 appels) atteinte : relancer dans une heure")
             time.sleep(65 if b"minute" in msg.lower() else 20 * (k + 1))
     raise SystemExit("Open-Meteo injoignable")
 
@@ -107,14 +109,20 @@ def fetch(pts, start, end, host):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--budget", type=int, default=24, help="nombre maximal de requêtes de 14 jours")
+    ap.add_argument("--flights", default=os.path.join(SITE, "calib", "igc", "catalogue.json"),
+                    help="catalogue des vols (calib/igc/catalogue.json) : leurs journées sont gardées, même hors saison ou pluvieuses")
     args = ap.parse_args()
+    flights = set()
+    if args.flights and os.path.exists(args.flights):
+        flights = {dt.date.fromisoformat(c["date"]) for c in json.load(open(args.flights, encoding="utf-8")) if c["date"] != "2026-09-10"}
+        print(f"{len(flights)} journées de vol à garder")
     os.makedirs(OUT, exist_ok=True)
     ipath = os.path.join(OUT, "index.json")
     index = json.load(open(ipath)) if os.path.exists(ipath) else {}
     stored = {d: o for d, o in index.get("days", [])}
     checked = set(index.get("wet", []))              # journées pluvieuses déjà vues (non stockées)
     today = dt.date.today()
-    want = wanted(today)
+    want = wanted(today) | {d for d in flights if d < today - dt.timedelta(days=1)}
     # ménage : journées sorties de la fenêtre
     for d in list(stored):
         if dt.date.fromisoformat(d) not in want:
@@ -123,13 +131,13 @@ def main():
                 os.remove(f)
             del stored[d]
     checked = {d for d in checked if dt.date.fromisoformat(d) in want}
-    todo = sorted(d for d in want if d.isoformat() not in stored and d.isoformat() not in checked)
+    todo = sorted(d for d in want if d.isoformat() not in stored and (d.isoformat() not in checked or d in flights))
     pts = points()
-    # regroupe les jours manquants en blocs consécutifs de 14 jours au plus
+    # regroupe les jours manquants en fenêtres de 14 jours au plus (une requête coûte pareil pour 1 ou 14 jours)
     blocks, cur = [], []
     edge = today - dt.timedelta(days=RECENT)
     for d in todo:
-        if cur and ((d - cur[-1]).days != 1 or len(cur) == 14 or (cur[-1] < edge) != (d < edge)):
+        if cur and ((d - cur[0]).days >= 14 or (cur[-1] < edge) != (d < edge)):
             blocks.append(cur); cur = []
         cur.append(d)
     if cur:
@@ -139,9 +147,10 @@ def main():
     # l'API de prévision garde les variables de surface ~60 jours (les niveaux de pression plus longtemps) :
     # au-delà de RECENT jours, l'API d'archives
     recent = today - dt.timedelta(days=RECENT)
-    blocks.sort(key=lambda b: b[0] < recent)          # d'abord les journées récentes
+    # d'abord les fenêtres qui contiennent le plus de journées de vol, puis les journées récentes
+    blocks.sort(key=lambda b: (-sum(d in flights for d in b), b[0] < recent))
     try:
-        grab(blocks[:args.budget], pts, sc, stored, checked, recent)
+        grab(blocks[:args.budget], pts, sc, stored, checked, recent, flights)
     finally:
         index = {"model": MODEL, "ng": NG, "h0": H0, "h1": H1, "vars": VARS, "scale": [float(s) for s in sc],
                  "days": sorted([d, o] for d, o in stored.items()), "wet": sorted(checked),
@@ -150,7 +159,7 @@ def main():
         print(f"{len(stored)} journées stockées, {len(checked)} pluvieuses écartées")
 
 
-def grab(blocks, pts, sc, stored, checked, recent):
+def grab(blocks, pts, sc, stored, checked, recent, flights=frozenset()):
     for b in blocks:
         data = fetch(pts, b[0], b[-1], "api.open-meteo.com" if b[0] >= recent else "historical-forecast-api.open-meteo.com")
         times = data[0]["hourly"]["time"]
@@ -163,7 +172,7 @@ def grab(blocks, pts, sc, stored, checked, recent):
                 print(f"  {iso} incomplet, repris plus tard", flush=True)
                 continue
             rain = np.nanmean([[data[k]["hourly"]["precipitation"][i] or 0 for i in idx[2:13]] for k in range(len(pts))])
-            if rain * 11 >= 1.0:
+            if rain * 11 >= 1.0 and day not in flights:     # journée de vol : gardée même s'il a plu quelque part
                 checked.add(iso)
                 continue
             arr = np.full((len(VARS), len(pts), len(idx)), -32768, np.int32)
