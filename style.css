@@ -80,6 +80,17 @@ h3.sub { font-size: 13px; margin: 12px 0 0; color: var(--ink); }
 .feedimg { image-rendering: pixelated; }
 .muted { color: var(--muted); }
 .probrow { margin-top: 12px; }
+.filepick { display: block; margin-top: 10px; font-size: 14px; }
+.filepick input { display: block; margin-top: 6px; max-width: 100%; color: var(--ink2); }
+.flightlist { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.flightlist button.on { border-color: var(--accent); background: #2a1c12; }
+.tbl { overflow-x: auto; }
+#flightTable table { border-collapse: collapse; font-size: 12px; margin-top: 8px; width: 100%; }
+#flightTable th, #flightTable td { padding: 3px 5px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+#flightTable th:first-child, #flightTable td:first-child { text-align: left; }
+#flightTable tr { cursor: pointer; }
+#flightTable tr:hover td { background: var(--surf2); }
+.leaflet-tooltip.spot .pass { color: #fbbf24; }
 #fieldChart { width: 100%; height: auto; margin-top: 10px; display: block; border-radius: 8px; background: var(--surf2); }
 .probrow label { display: block; font-size: 14px; }
 .probrow output { color: var(--ink); font-weight: 700; }

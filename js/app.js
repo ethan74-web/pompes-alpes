@@ -4,6 +4,7 @@ import { SCALES, css } from "./scales.js";
 import { addDays, isoDate, MODELS, DEFAULT_MODEL } from "./weather.js";
 import { drawBank, drawProfile, pause3D, pumpText, showPump3D } from "./pump3d.js";
 import { GLIDERS } from "./model.js";
+import { compareFlight, findThermals, flightStats, localHour, parseIGC } from "./igc.js";
 
 const $ = id => document.getElementById(id);
 const H0 = 7, H1 = 21;
@@ -17,7 +18,7 @@ const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { ret
 const st = { meta: null, date: null, hour: 14, layer: "climb", hours: new Map(), dayScores: new Map(), token: 0, point: null, playing: null,
   week: null, wanted: null, deferred: false, done: false, source: "", model: DEFAULT_MODEL, cmp: null, cmpToken: 0, feed: null };
 if (MODELS.some(m => m.id === store.get("model"))) st.model = store.get("model");
-let map, bounds, fieldLayer, windLayer, spotsLayer, namesLayer, feedLayer, baseLayers, canvas, ctx, wcanvas, wctx, worker, spotRenderer;
+let map, bounds, fieldLayer, windLayer, spotsLayer, namesLayer, feedLayer, baseLayers, canvas, ctx, wcanvas, wctx, worker, spotRenderer, flightLayer;
 window.__pompes = st;                       // accès pour le débogage dans la console
 window.__feed = (i, j) => askPoint(L.latLng(...cellCenter(i, j)), false, true);
 
@@ -111,6 +112,14 @@ function onReady(meta) {
   });
   $("open3d").addEventListener("click", open3D);
   $("exportCup").addEventListener("click", exportCup);
+  flightLayer = L.layerGroup().addTo(map);
+  $("igc").addEventListener("change", e => loadFlights(e.target.files));
+  $("flightClear").addEventListener("click", () => { st.flights = []; st.flight = null; flightLayer.clearLayers(); drawFlightList(); $("flightText").textContent = ""; $("flightTable").innerHTML = ""; });
+  for (const ev of ["dragover", "drop"]) $("map").addEventListener(ev, e => {
+    if (!e.dataTransfer || ![...e.dataTransfer.items || []].some(i => i.kind === "file")) return;
+    e.preventDefault();
+    if (ev === "drop") loadFlights(e.dataTransfer.files);
+  });
   $("pumpClose").addEventListener("click", close3D);
   $("pumpWin").addEventListener("click", e => { if (e.target === $("pumpWin")) close3D(); });
   document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("pumpWin").hidden) close3D(); });
@@ -176,6 +185,7 @@ function onWorker(m) {
     for (const x of st.hours.values()) best = Math.max(best, x.stats.spotClimb);
     st.dayScores.set(st.date, best);
     paintDays();
+    if (st.flight && st.flight.F.date === st.date) showFlight();
     if (st.week && st.weekRange && st.week.includes(st.date)) {        // pas d'aperçu de la semaine pour un jour ancien
       const dates = st.week.filter(d => !st.dayScores.has(d));
       if (dates.length) worker.postMessage({ type: "overview", token: st.token, dates, start: st.weekRange[0], end: st.weekRange[1], model: st.model });
@@ -364,6 +374,87 @@ function drawSpots() {
     }
   }
   $("spotCount").textContent = overview ? `(${shown} principales, ${X.spots.filter(s => s.prob >= minP).length} en zoomant)` : `(${shown} sur ${X.spots.length})`;
+}
+
+// ---------------------------------------------------------------- mes vols : traces IGC comparées à la prévision
+async function loadFlights(files) {
+  st.flights = st.flights || [];
+  for (const f of files) {
+    try {
+      const F = parseIGC(await f.text()), th = findThermals(F);
+      st.flights.push({ name: f.name.replace(/\.igc$/i, ""), F, th });
+    } catch (e) { setStatus(`${f.name} : ${e.message}`, true); }
+  }
+  drawFlightList();
+  if (st.flights.length) selectFlight(st.flights[st.flights.length - 1]);
+}
+function drawFlightList() {
+  const box = $("flightList"); box.innerHTML = "";
+  $("flightClear").hidden = !(st.flights && st.flights.length);
+  for (const fl of st.flights || []) {
+    const b = document.createElement("button");
+    b.type = "button"; b.textContent = `${fl.F.date.split("-").reverse().join("/")} · ${fl.th.length} spirales`;
+    b.title = fl.name; b.classList.toggle("on", fl === st.flight);
+    b.addEventListener("click", () => selectFlight(fl));
+    box.appendChild(b);
+  }
+}
+function selectFlight(fl) {
+  st.flight = fl; drawFlightList();
+  flightLayer.clearLayers();
+  const pts = fl.F.fixes.filter((_, k) => k % 3 === 0).map(f => [f.lat, f.lon]);
+  flightLayer.addLayer(L.polyline(pts, { color: "#0b0d0e", weight: 4, opacity: 0.6, interactive: false }));
+  flightLayer.addLayer(L.polyline(pts, { color: "#ffffff", weight: 1.8, opacity: 0.9, interactive: false }));
+  map.fitBounds(L.latLngBounds(pts).pad(0.1));
+  const first = fl.th.find(T => T.gain >= 200) || fl.th[0];
+  if (first) { st.hour = Math.min(H1, Math.max(H0, Math.round(first.h))); $("hour").value = st.hour; }
+  if (st.date === fl.F.date && st.done) showFlight();
+  else { $("flightText").textContent = `Calcul de la prévision du ${labelDate(fl.F.date)}…`; selectDate(fl.F.date, !(st.week && st.week.includes(fl.F.date))); }
+}
+function spotsAt(h) {
+  const X = st.hours.get(h);
+  if (!X) return null;
+  return X.ll || (X.ll = X.spots.map(s => { const [lat, lon] = cellCenter(s.i, s.j); return { ...s, lat, lon }; }));
+}
+const hm = h => `${Math.floor(h)} h ${String(Math.round((h % 1) * 60)).padStart(2, "0")}`;
+function showFlight() {
+  const fl = st.flight;
+  const cmp = compareFlight(fl.F, fl.th, spotsAt), S = flightStats(cmp);
+  fl.cmp = cmp; fl.stats = S;
+  // spirales et pompes survolées sur la carte
+  for (const l of flightLayer.getLayers().slice(2)) flightLayer.removeLayer(l);
+  for (const r of cmp.rows) {
+    const T = r.T, col = T.gain < 100 ? "#94a3b8" : css(SCALES.climb.col(Math.max(0.2, T.climb)));
+    const pred = r.s ? `<br>prévu (${Math.round(r.d)} m, ${r.inside ? "dans" : "hors de"} la zone) : +${fr(Math.max(0, r.s.vz))} m/s, plafond ${km(r.s.ceil)} m, fiabilité ${pct(r.s.prob)}, ${r.s.bank}°` : "<br>pas de prévision à cette heure";
+    flightLayer.addLayer(L.circleMarker([T.lat, T.lon], { radius: 4 + 2 * Math.min(4, Math.max(0, T.climb)), color: "#0b0d0e", weight: 1.5, fillColor: col, fillOpacity: 1 })
+      .bindTooltip(`<b>${hm(T.h)} · ${T.gain < 100 ? "spirale sans gain" : `+${fr(T.climb)} m/s`}</b> (meilleures 30 s : +${fr(Math.max(0, T.best))})<br>${km(T.base)} → ${km(T.top)} m · ${Math.round(T.circles)} tours · ${Math.round(T.bank)}°, rayon ${Math.round(T.radius)} m${pred}`, { className: "spot", direction: "top" }));
+  }
+  for (const p of cmp.passed) if (!p.used) {
+    flightLayer.addLayer(L.circleMarker([p.s.lat, p.s.lon], { radius: 5, color: "#fbbf24", weight: 2, fill: false })
+      .bindTooltip(`<span class="pass"><b>Passée sans spiraler</b></span> à ${hm(localHour(fl.F.date, p.t))}, à ${km(p.alt)} m<br>prévu : +${fr(Math.max(0, p.s.vz))} m/s, plafond ${km(p.s.ceil)} m, fiabilité ${pct(p.s.prob)}<br><span class="muted">à confirmer : manquée, cherchée ailleurs, ou inutile ?</span>`, { className: "spot", direction: "top" }));
+  }
+  // bilan
+  const out = [`<b>${labelDate(fl.F.date)}</b> : ${fl.th.length} spirales, dont ${fl.th.filter(T => T.gain >= 200).length} avec plus de 200 m de gain.`];
+  if (S.n) {
+    out.push(`Vz prévue − Vz moyenne relevée : <b>${S.bias >= 0 ? "+" : "−"}${fr(Math.abs(S.bias))} m/s</b>, erreur type ${fr(S.rms)} m/s (une valeur constante ferait ${fr(S.rmsConst)}), corrélation ${fr(S.corr, 2)}.`);
+    out.push(`Plafond prévu − sommet atteint : ${S.ceilBias >= 0 ? "+" : "−"}${km(Math.abs(S.ceilBias))} m. Pompe prévue à moins de 1 km : ${pct(S.within1)} des spirales ; dans la zone à 95 % : ${pct(S.inside)}.`);
+  }
+  const bl = S.bins.filter(b => b.n);
+  if (bl.length) out.push(`Pompes prévues survolées sous leur plafond, et prises : ` + bl.map(b => `fiabilité ${Math.round(b.lo * 100)}–${Math.min(100, Math.round(b.hi * 100))} % : ${b.used}/${b.n}`).join(" · ") + ".");
+  const all = (st.flights || []).filter(f => f.stats && f.stats.n);
+  if (all.length > 1) {
+    const n = all.reduce((s, f) => s + f.stats.n, 0), w = k => all.reduce((s, f) => s + f.stats[k] * f.stats.n, 0) / n;
+    out.push(`<b>Bilan de ${all.length} vols</b> (${n} spirales) : biais ${fr(w("bias"))} m/s, erreur type ${fr(Math.sqrt(all.reduce((s, f) => s + f.stats.rms ** 2 * f.stats.n, 0) / n))} m/s.`);
+  }
+  $("flightText").innerHTML = out.join("<br>");
+  const rows = cmp.rows.filter(r => r.T.gain >= 100);
+  $("flightTable").innerHTML = rows.length ? `<table><thead><tr><th>Heure</th><th>Vz relevée</th><th>Vz prévue</th><th>Sommet</th><th>Plafond prévu</th><th>Incl.</th><th>Écart</th></tr></thead><tbody>`
+    + rows.map((r, k) => `<tr data-k="${k}"><td>${hm(r.T.h)}</td><td>+${fr(r.T.climb)}</td><td>${r.s ? "+" + fr(Math.max(0, r.s.vz)) : "–"}</td><td>${km(r.T.top)}</td><td>${r.s ? km(r.s.ceil) : "–"}</td><td>${Math.round(r.T.bank)}° / ${r.s ? r.s.bank + "°" : "–"}</td><td>${r.s ? fr(r.d / 1000) + " km" : "–"}</td></tr>`).join("") + "</tbody></table>" : "";
+  for (const tr of $("flightTable").querySelectorAll("tr[data-k]")) tr.addEventListener("click", () => {
+    const T = rows[+tr.dataset.k].T;
+    st.hour = Math.min(H1, Math.max(H0, Math.round(T.h))); $("hour").value = st.hour; stopPlay(); render();
+    map.setView([T.lat, T.lon], Math.max(map.getZoom(), 12));
+  });
 }
 
 // ---------------------------------------------------------------- export des pompes du jour (.cup : SeeYou, XCSoar)

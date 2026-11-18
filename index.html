@@ -71,6 +71,18 @@
       </section>
 
       <section>
+        <div class="row between">
+          <h2>Mes vols</h2>
+          <button id="flightClear" type="button" hidden>Effacer</button>
+        </div>
+        <label class="filepick">Trace IGC (WeGlide, SeeYou…) <input type="file" id="igc" accept=".igc,.IGC" multiple></label>
+        <div id="flightList" class="flightlist"></div>
+        <p id="flightText" class="summary"></p>
+        <div id="flightTable" class="tbl"></div>
+        <p class="hint">La trace est lue dans votre navigateur, elle n'est envoyée nulle part. Chaque spirale (au moins 1,5 tour et 40 s) est comparée à la pompe prévue la plus proche à la même heure. Les pompes survolées en plané sous leur plafond, sans spirale à moins de 1,2 km, sont « passées sans spiraler » : à confirmer, car on peut aussi les avoir manquées, cherchées au mauvais endroit, ou ne pas en avoir eu besoin.</p>
+      </section>
+
+      <section>
         <h2>Carte</h2>
         <div class="chips" id="layers" role="radiogroup" aria-label="Grandeur affichée">
           <button type="button" data-layer="climb" class="on">Vz</button>
