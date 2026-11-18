@@ -101,6 +101,9 @@
   $$\frac{d\theta_{v,p}}{dz} = -\frac{\theta_{v,p} - \theta_{v,e}}{L_e}, \qquad L_e = 2\ \text{km}$$
   <p>Le sommet des thermiques \(z_t\) est l'altitude où la particule devient plus lourde que l'air. Une couche stable, même faible, l'arrête d'autant plus tôt qu'elle est partie bas et avec peu d'excès : c'est l'effet de « couvercle ». Une particule partie d'une pente chauffée en altitude, plus chaude que l'air libre au même niveau, le traverse. Le calcul est fait sur une grille de 450 m, puis interpolé.</p>
   <p>La convection part du pied des versants plutôt que du sommet : on prend comme base \(z_b = \min(z, \bar z)\), et l'épaisseur de la couche brassée est \(z_i = z_t - z_b\).</p>
+  <p><b>Couvercle de l'air de vallée.</b> Dans une vallée large et encaissée (cluse de Chambéry, Combe de Savoie, Grésivaudan), la couche brassée reste sous les crêtes : les brises de pente exportent la chaleur vers les sommets, l'air qui redescend au-dessus de la vallée pour compenser la stabilise, et la brise de vallée y amène l'air plus frais des plaines. Les modèles météo, trop lissés, ne le voient pas. On mesure, dans un rayon de 6 km, le fond de vallée \(z_f\) (5<sup>e</sup> centile du relief) et les crêtes \(z_c\) (98<sup>e</sup> centile). Une particule qui part du bas de la vallée rencontre à \(z_c\) une couche de 300 m plus chaude de \(5\,f\) K, avec</p>
+  $$f = \operatorname{clip}\Big(\frac{z_c - z_f - 500}{400}\Big)\,\operatorname{clip}\Big(\frac{e - 0{,}05}{0{,}15}\Big)\,\operatorname{clip}\Big(\frac{0{,}5 - h}{0{,}15}\Big)$$
+  <p>où \(e\) est la part du disque au-dessus de 60 % de la hauteur (vallée fermée plutôt que plaine au pied d'un seul relief) et \(h = (\bar z - z_f)/(z_c - z_f)\) la position du départ dans la vallée. Les thermiques des pentes hautes ne sont pas concernés. Au Mont Saint-Michel, \(z_c \approx 1\,400\) m : le plafond annoncé passe de 3 250 m à 1 400 m, comme relevé le 8 juillet. Un jour où la particule garde plus de 5 K d'excès, elle perce : le modèle peut alors dépasser 2 000 m, mais ce cas n'a pas encore été vérifié en vol.</p>
   <p><b>Base des cumulus.</b> Avec un rapport de mélange pris à 60 % en surface et à 40 % dans le premier tiers de la couche (mélange par les thermiques), le niveau de condensation vaut</p>
   $$z_{\text{LCL}} \simeq z_b + 125\ \text{m/K}\times (T_p - T_d)$$
   <p>S'il est sous le sommet des thermiques, la journée est à cumulus et le plafond est la base ; sinon les thermiques sont bleus et le plafond utilisable est pris à 93 % de la couche (recalé sur les vols).</p>
@@ -117,7 +120,7 @@
   $$v_b = 3\ \text{m/s}\times\Big(\min\big(1{,}3,\tfrac{H}{300}\big)\Big)^{1/3}\Big(\min\big(1,\tfrac{\tan\gamma}{0{,}35}\big)\Big)^{1/2}$$
   <p>dans la direction de la montée \(\hat u\) (relief lissé à 200 m). L'air près du sol suit \(\vec v = v_b\,\hat u + 0{,}6\,\vec U'\) : 60 % du vent atteint les premières dizaines de mètres. Ces flèches vertes sont affichées quand on zoome sur la carte.</p>
   <h3>Chaleur collectée</h3>
-  <p>Chaque maille envoie son air vers la voisine (parmi 8) dans la direction de \(\vec v\). Le long de ces trajets, l'air accumule la chaleur des pentes qu'il longe, \(H\,\Delta x^2\) par maille, avec une perte \(e^{-\Delta x/2{,}5\,\text{km}}\) à chaque pas et un trajet de 3 km au plus. Là où deux mailles s'envoient l'air l'une à l'autre (crête de convergence), il monte dans la plus haute. La chaleur \(Q\) (en watts) relâchée en montée dans un rayon d'environ 300 m (noyau en cloche) nourrit un panache. L'indice d'alimentation affiché vaut \(Q/Q_0\) avec \(Q_0 = 2\) GW.</p>
+  <p>Chaque maille envoie son air vers la voisine (parmi 8) dans la direction de \(\vec v\). Le long de ces trajets, l'air accumule la chaleur des pentes qu'il longe, \(H\,\Delta x^2\) par maille (flux de chaque pente, moyenné sur 450 m seulement, pour ne pas mélanger les deux versants d'une crête), avec une perte \(e^{-\Delta x/2{,}5\,\text{km}}\) à chaque pas et un trajet de 3 km au plus. Là où l'air tourne en rond — deux mailles qui se l'envoient (crête de convergence), ou une boucle plus longue sur un sommet aplati —, il converge et monte dans la plus haute maille de la boucle. (Jusqu'en novembre 2026, seules les boucles de deux mailles étaient reconnues : sur certains sommets, comme le Penay le 22 juillet, la chaleur tournait sans fin et la pompe disparaissait.) La chaleur \(Q\) (en watts) relâchée en montée dans un rayon d'environ 300 m (noyau en cloche) nourrit un panache. L'indice d'alimentation affiché vaut \(Q/Q_0\) avec \(Q_0 = 2\) GW.</p>
   <p>Une crête droite reçoit l'air de ses deux versants sur toute sa longueur ; un éperon, un sommet ou une confluence reçoivent l'air de plusieurs côtés et concentrent bien plus de chaleur : c'est là que naissent les pompes étroites et puissantes. Le vent les déplace : il renforce l'alimentation au vent et la coupe sous le vent quand il dépasse la brise.</p>
 
   <h2><small>Étape 5</small>Du thermique au vario</h2>
@@ -133,20 +136,33 @@
   $$w_P = k_P\,B^{1/3}\,z'^{-1/3}\,\big(1-\zeta^2\big), \qquad R_P = 0{,}12\,z'$$
   <p>Avec un coefficient d'entraînement de 0,1, la théorie donne \(k_P = 2{,}55\) pour un panache continu ; le recalage sur les vols donne \(k_P = 1{,}3\), c'est-à-dire qu'environ 13 % de la chaleur collectée part dans le panache. Le facteur \(1-\zeta^2\) l'éteint sous le sommet de la couche. Un panache est étroit (140 m de rayon à 1 000 m au-dessus du sol) : il faut le serrer, mais il est régulier.</p>
   <h3>Le planeur en spirale</h3>
-  <p>À 90 km/h (\(V = 25\) m/s) et 45° d'inclinaison, le rayon de virage est</p>
-  $$r_v = \frac{V^2}{g\tan\varphi} = 63{,}7\ \text{m}$$
-  <p>Le facteur de charge vaut \(n = 1/\cos\varphi = \sqrt 2\). La polaire d'un planeur de classe standard est approchée par</p>
+  <p>La polaire d'un planeur de classe standard est approchée par</p>
   $$s(V,n) = a_p V^3 + b_p\,\frac{n^2}{V}, \qquad a_p = 2{,}38\times10^{-5},\; b_p = 8{,}02$$
-  <p>ajustée sur 0,60 m/s à 75 km/h et 0,80 m/s à 100 km/h en ligne droite. En spirale : \(s = 1{,}01\) m/s. Les deux structures se superposent, avec des profils radiaux gaussiens, et la Vz affichée est ce qu'indique le vario, moyennée sur trois hauteurs de la couche (30, 50 et 70 %) :</p>
-  $$V_z = \Big\langle\, w_A\,e^{-(r_v/R_A)^2} + w_P\,e^{-(r_v/R_P)^2} - s \,\Big\rangle_{\zeta\in\{0{,}3;\,0{,}5;\,0{,}7\}}$$
+  <p>ajustée sur 0,60 m/s à 75 km/h et 0,80 m/s à 100 km/h en ligne droite ; \(n = 1/\cos\varphi\) est le facteur de charge à l'inclinaison \(\varphi\). La chute minimale est atteinte à \(V_m = (b_p/3a_p)^{1/4}\), et en virage à \(V_m\sqrt n\) ; on spirale un peu plus vite, à \(V = 1{,}05\,V_m\sqrt n\), sur un rayon</p>
+  $$r_v = \frac{V^2}{g\tan\varphi}$$
+  <p>Le pilote serre dans une pompe étroite et élargit dans une pompe large : on calcule trois spirales et on garde la meilleure.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Inclinaison</th><th>Vitesse</th><th>Rayon</th><th>Chute</th></tr></thead>
+    <tbody>
+      <tr><td>35°</td><td>76 km/h</td><td>66 m</td><td>0,79 m/s</td></tr>
+      <tr><td>45°</td><td>82 km/h</td><td>53 m</td><td>0,99 m/s</td></tr>
+      <tr><td>55°</td><td>91 km/h</td><td>46 m</td><td>1,35 m/s</td></tr>
+    </tbody>
+  </table></div>
+  <p>Les deux structures se superposent, avec des profils radiaux gaussiens, et la Vz affichée est ce qu'indique le vario, moyennée sur trois hauteurs de la couche (30, 50 et 70 %) :</p>
+  $$V_z = \max_{\varphi\in\{35°,45°,55°\}}\Big\langle\, w_A\,e^{-(r_v/R_A)^2} + w_P\,e^{-(r_v/R_P)^2} \Big\rangle_{\zeta\in\{0{,}3;\,0{,}5;\,0{,}7\}} - s(V,n)$$
+  <p>Jusqu'en novembre 2026, la Vz était calculée pour une seule spirale (45°, 90 km/h, 64 m de rayon) : dans les thermiques étroits d'une couche basse, comme au Mont Saint-Michel, le planeur restait en dehors du cœur et la pompe disparaissait.</p>
   <p>Un vent de plus de 9 m/s dans la couche hache les thermiques (Vz réduite jusqu'à 40 %), une averse les éteint presque (× 0,35).</p>
 
   <h2><small>Étape 6</small>Les pompes et leur alimentation</h2>
-  <p>La Vz, pondérée par l'alimentation (\(\times(0{,}7 + 0{,}3\min(1, Q/Q_0))\)), est lissée, puis on retient ses maxima locaux, d'abord les plus forts, en imposant 1,65 km entre deux pompes (450 au plus). Le point affiché est le point de départ au sol ; le trait montre la dérive jusqu'au plafond.</p>
+  <p>La Vz, pondérée par l'alimentation (\(\times(0{,}7 + 0{,}3\min(1, Q/Q_0))\)), est lissée, puis on retient ses maxima locaux, d'abord les plus forts, en imposant 1 km entre deux pompes (800 au plus). Les jours forts, cette limite est atteinte par les pompes de montagne : on garde en plus les pompes d'au moins 1 m/s isolées (à plus de 2 km de toute autre), celles des bas reliefs près des terrains. Le point affiché est le point de départ au sol ; le trait montre la dérive jusqu'au plafond.</p>
+  <p><b>Bassin et partage de l'air.</b> Chaque parcelle d'air près du sol suit un seul trajet et monte en un seul point de convergence : sa chaleur n'est jamais comptée deux fois. Mais le long d'une crête, l'air qui monte ne forme pas un rideau continu : il s'organise en thermiques espacés de l'ordre de l'épaisseur de la couche. Chaque pompe puise donc la chaleur des points de convergence jusqu'à</p>
+  $$R = \min(1{,}5\ \text{km},\; 0{,}4\,z_i), \qquad \text{poids } e^{-(d/R)^2}$$
+  <p>Un point de convergence vu par plusieurs pompes est partagé au prorata du poids et de la force de chaque pompe : l'air qui nourrit une pompe ne nourrit plus sa voisine. Le 8 juillet à 15 h, une pompe sur dix partage plus de 14 % de son bassin, jusqu'à 67 % pour deux pompes proches. La chaleur obtenue (multipliée par 1,35 pour qu'une pompe isolée garde, en moyenne, la chaleur recalée le 8 juillet) remplace \(Q\) dans le panache et dans la probabilité.</p>
   <p><b>Alimentation d'une pompe.</b> Pour une pompe de plus de 3 m/s, un clic montre la zone dont l'air chaud rejoint la pompe (à moins de 300 m) et les principaux trajets de cet air près du sol. La rose recalcule l'alimentation, dans une fenêtre de 18 km, pour un vent uniforme près du relief venant de 16 directions, de 0 à 40 km/h (ajusté au relief comme ci-dessus), et donne la Vz du meilleur panache à moins de 600 m de la pompe. Avec le vent réel des balises, on voit si la pompe a des chances d'être là.</p>
 
   <h2><small>Étape 7</small>Incertitudes à 95 % et probabilité</h2>
-  <p>Chaque pompe est recalculée 300 fois en tirant au hasard les erreurs des entrées :</p>
+  <p>Chaque pompe est recalculée 200 fois en tirant au hasard les erreurs des entrées :</p>
   <div class="tbl"><table>
     <thead><tr><th>Grandeur</th><th>Erreur tirée</th></tr></thead>
     <tbody>
@@ -161,37 +177,47 @@
       <tr><td>Point de déclenchement</td><td>étendue de la zone favorable (mailles à plus de 70 % du maximum dans un rayon de 1,2 km) + 1 km (recalé)</td></tr>
     </tbody>
   </table></div>
-  <p><b>Fourchettes.</b> Les bornes affichées pour la Vz et le plafond sont les quantiles 2,5 % et 97,5 % des 300 tirages.</p>
+  <p><b>Fourchettes.</b> Les bornes affichées pour la Vz et le plafond sont les quantiles 2,5 % et 97,5 % des 200 tirages.</p>
   <p><b>Ellipse.</b> Pour chaque tirage, on calcule où se trouve le thermique à mi-hauteur de la bande exploitable : point de départ décalé, plus la dérive \(\vec U\,t\) avec \(t = \tfrac12(z_{\text{plafond}} - z)/w(r_v)\). La matrice de covariance \(\Sigma\) de ces positions a pour valeurs propres \(\lambda_1\ge\lambda_2\) ; \((\vec x - \vec\mu)^{\mathsf T}\Sigma^{-1}(\vec x-\vec\mu)\) suit une loi du \(\chi^2\) à deux degrés de liberté, et le contour à 95 % est l'ellipse de demi-axes</p>
   $$a = \sqrt{5{,}991\,\lambda_1}, \qquad b = \sqrt{5{,}991\,\lambda_2}$$
-  <p><b>Probabilité.</b> \(P = P_{\text{dév}}\times P_{\text{site}}\), avec \(P_{\text{dév}}\) la part des tirages où le thermique est exploitable (\(V_z\ge 0{,}5\) m/s et au moins 300 m de gain) et \(P_{\text{site}} = 0{,}2 + 0{,}7\,\min(1,Q/Q_0)\,(0{,}3 + 0{,}7\,p)\) les chances que le déclenchement se fasse bien là ; \(p\) mesure combien la pompe ressort de son voisinage.</p>
+  <p><b>Probabilité.</b> \(P = P_{\text{dév}}\times P_{\text{site}}\), avec \(P_{\text{dév}}\) la part des tirages où le thermique est exploitable (\(V_z\ge 0{,}5\) m/s et au moins 300 m de gain) et \(P_{\text{site}}\) les chances que le déclenchement se fasse bien là :</p>
+  $$P_a = 0{,}2 + 0{,}7\,\min(1,Q/Q_0)\,(0{,}3 + 0{,}7\,p), \qquad P_{\text{site}} = P_a + 0{,}6\,(0{,}92 - P_a)\,c$$
+  <p>\(p\) mesure combien la pompe ressort de son voisinage ; \(c = \operatorname{clip}\big((\Omega_c - 0{,}1)/0{,}3\big)\) vaut 1 sur un sommet ou un éperon bien bombé (courbure \(\Omega_c\) sur 1 km) : ces reliefs fixent le déclenchement, comme la chapelle du Mont Saint-Michel ou le Penay, « souvent là ». Le bonus ne relève que les pompes moins bien alimentées, sans dépasser 92 %.</p>
   <div class="note">\(P_{\text{site}}\) est une hypothèse de travail, pas une fréquence mesurée. Pour la caler, il faut aussi des pompes cherchées et non trouvées (diagramme de fiabilité, score de Brier).</div>
 
+  <h2><small>Au clic</small>La pompe en 3D</h2>
+  <p>Un clic sur une pompe ouvre une vue en trois dimensions : relief à l'échelle sur ±3 km, colorié par la chaleur rendue à l'air ; colonne du thermique sur 25 niveaux du sol au plafond, qui penche avec le vent (dérive pendant la montée de l'air au cœur) ; points de convergence d'où l'air chaud part vraiment (boules, d'autant plus grosses qu'elles apportent de chaleur à la pompe) ; trajets de l'air près du sol pour les pompes de plus de 3 m/s.</p>
+  <p>À chaque niveau, la vitesse de l'air à la distance \(r\) du centre est</p>
+  $$w(r) = \sum_{k\in\{A,P\}} w_k\Big(e^{-(r/R_k)^2} - 0{,}44\,\rho\, e^{-\left(\frac{r - 1{,}6R_k}{0{,}4R_k}\right)^2}\Big)$$
+  <p>Le second terme est un anneau de descendance autour du thermique, qui rend la part \(\rho = 40\) % du débit montant \(\pi R_k^2 w_k\) (forme inspirée d'Allen, 2006 ; valeur supposée, non recalée). On en tire : le diamètre où l'air monte à plus de la moitié de la vitesse au centre (tube coloré), le bord où il ne monte plus (enveloppe claire), la descendance (anneaux bleus) et, pour chaque inclinaison de 25 à 60°, la Vz au vario ; la meilleure est l'<b>inclinaison conseillée</b> (anneau orange).</p>
+  <p><b>Turbulence.</b> On l'estime par l'écart de vitesse verticale entre les deux bouts d'aile (15 m) : sur la spirale conseillée, et au plus fort en traversant le bord pour entrer dans la pompe. Moins de 0,4 m/s : faible ; 0,4 à 0,9 : modérée ; au-delà : forte. Une pompe étroite et puissante secoue, surtout à l'entrée ; en la serrant, on reste dans la partie la plus régulière. Un vent qui change de plus de 15 km/h entre le bas et le haut de la montée penche et hache la colonne. Les petits tourbillons, eux, ne sont pas représentés.</p>
+
   <h2><small>Recalage</small>Le vol du 8 juillet 2026</h2>
-  <p>Circuit Pointe Percée – Chamrousse – Semnoz depuis Challes, 14 h 38 – 18 h 24. Dix pompes relevées (Vz au vario et plafond), heure estimée par la distance parcourue. Ce sont les pompes choisies par le pilote : on les compare à la pompe annoncée la plus proche (à moins de 2 km), pas au champ moyen. Données : « meilleur choix » d'Open-Meteo, interpolées entre les deux heures qui encadrent chaque relevé.</p>
+  <p>Circuit Pointe Percée – Chamrousse – Semnoz depuis Challes, 14 h 38 – 18 h 24. Dix pompes relevées (Vz au vario et plafond), heure estimée par la distance parcourue. Ce sont les pompes choisies par le pilote : on les compare à la pompe annoncée la plus proche (à moins de 2 km), pas au champ moyen. Données : « meilleur choix » d'Open-Meteo, à l'heure ronde la plus proche de chaque relevé.</p>
   <div class="tbl"><table>
     <thead><tr><th>Pompe</th><th>Relevé Vz / plafond</th><th>Pompe annoncée (distance) : Vz / plafond</th></tr></thead>
     <tbody>
-      <tr><td>Mont Saint-Michel, 14 h 45 – 14 h 55</td><td>1,5 / 1 300 – 1 430</td><td>3,5 / 3 250 (0,9 km)</td></tr>
-      <tr><td>Pic de la Sauge, 15 h 05</td><td>3 / 3 100</td><td>3,7 / 3 570 (sur place)</td></tr>
-      <tr><td>Dent d'Arclusaz, 15 h 10</td><td>3 / 3 250</td><td>4,3 / 3 610 (0,5 km)</td></tr>
-      <tr><td>Mont Charvin, 15 h 35</td><td>3,5 / 3 600</td><td>3,2 / 3 560 (0,3 km)</td></tr>
-      <tr><td>Col de Balme (La Clusaz), 15 h 40</td><td>3 / 3 500</td><td>3,0 / 3 600 (1,4 km)</td></tr>
-      <tr><td>Pointe de la Blonnière, 16 h</td><td>2,5 / 3 750</td><td>2,9 / 3 600 (1,6 km)</td></tr>
-      <tr><td>La Tuile (Grand Arc), 16 h 20</td><td>5 / 3 900</td><td>3,3 / 3 790 (sur place)</td></tr>
-      <tr><td>Cime de la Jasse (7 Laux), 16 h 55</td><td>3,5 / 3 400</td><td>2,4 / 3 710 (1,3 km)</td></tr>
-      <tr><td>Margériaz sud, 17 h 45</td><td>3,5 / 3 200</td><td>1,8 / 2 800 (1,5 km)</td></tr>
+      <tr><td>Mont Saint-Michel, 14 h 45 – 14 h 55</td><td>1,5 / 1 300 – 1 430</td><td>1,5 / 1 400 (0,9 km), à 55°</td></tr>
+      <tr><td>Pic de la Sauge, 15 h 05</td><td>3 / 3 100</td><td>3,8 / 3 590 (sur place)</td></tr>
+      <tr><td>Dent d'Arclusaz, 15 h 10</td><td>3 / 3 250</td><td>4,8 / 3 590 (0,5 km)</td></tr>
+      <tr><td>Mont Charvin, 15 h 35</td><td>3,5 / 3 600</td><td>3,8 / 3 560 (0,3 km)</td></tr>
+      <tr><td>Col de Balme (La Clusaz), 15 h 40</td><td>3 / 3 500</td><td>4,3 / 3 690 (1,4 km)</td></tr>
+      <tr><td>Pointe de la Blonnière, 16 h</td><td>2,5 / 3 750</td><td>3,3 / 3 560 (0,6 km)</td></tr>
+      <tr><td>La Tuile (Grand Arc), 16 h 20</td><td>5 / 3 900</td><td>3,7 / 3 830 (sur place)</td></tr>
+      <tr><td>Cime de la Jasse (7 Laux), 16 h 55</td><td>3,5 / 3 400</td><td>2,7 / 3 610 (0,8 km)</td></tr>
+      <tr><td>Margériaz sud, 17 h 45</td><td>3,5 / 3 200</td><td>2,0 / 2 810 (1,5 km)</td></tr>
     </tbody>
   </table></div>
-  <p>Sur les huit pompes de relief : Vz de la pompe annoncée, biais −0,3 m/s et écart quadratique 1,1 m/s (toutes à moins de 2 km) ; plafond, biais +60 m et écart quadratique 250 m. Les huit Vz et les huit plafonds tombent dans les fourchettes à 95 % ; sept pompes sur huit tombent dans l'ellipse de la pompe annoncée la plus proche, avec un écart type du point de déclenchement de 1 km (positions relevées « par secteur »). Coefficients retenus : \(k_P = 1{,}3\) (environ 13 % de la chaleur collectée part dans le panache), entraînement \(L_e = 2\) km, plafond à 93 % de la couche.</p>
+  <p>Sur les huit pompes de relief : Vz de la pompe annoncée, biais +0,2 m/s et écart quadratique 1,2 m/s (toutes à moins de 2 km) ; plafond, biais +70 m et écart quadratique 280 m. Les huit Vz et les huit plafonds tombent dans les fourchettes à 95 % ; sept pompes sur huit tombent dans l'ellipse de la pompe annoncée la plus proche, avec un écart type du point de déclenchement de 1 km (positions relevées « par secteur »). Coefficients retenus : \(k_P = 1{,}3\) (environ 13 % de la chaleur collectée part dans le panache), entraînement \(L_e = 2\) km, plafond à 93 % de la couche.</p>
   <p><b>Arête sud du Margériaz.</b> Elle a été très active le 8 juillet et les jours suivants, mais la première version n'y montrait de pompe qu'une heure sur deux : le vent de nord du modèle était appliqué au ras du sol jusque sur les versants abrités. Avec l'abri sous le vent (étape 4), le secteur a une pompe presque toutes les heures de 11 h à 17 h, du 5 au 9 juillet, entre 3 et 4 m/s, classée parmi les 25 à 120 plus fortes de la carte (150 à 300 avant), avec une dérive qui suit l'arête vers le col des Prés.</p>
-  <p>Défauts restants : au Mont Saint-Michel, aucun modèle ne voyait le couvercle qui a arrêté les thermiques vers 1 400 m (la colline reçoit beaucoup d'air chaud de la plaine, d'où 3,5 m/s annoncés) ; la Vz baisse trop vite en fin d'après-midi (Jasse, Margériaz) ; la pompe « fusée » de la Tuile (5 m/s, étroite) est sous-estimée.</p>
+  <p><b>Mont Saint-Michel et Penay.</b> Aucun des six modèles ne voyait le couvercle qui a arrêté les thermiques du Mont Saint-Michel vers 1 400 m : la première version y annonçait 3,5 m/s et 3 250 m. Avec le couvercle de l'air de vallée (étape 3) et la spirale adaptée (étape 5), la pompe sort à 1,5 m/s à 55° et 1 400 m de plafond, sur la colline, avec 70 à 75 % de probabilité de 12 h à 16 h. Le Penay passe de 64 % à 82–90 % le 8 juillet ; le 22 juillet, il n'apparaissait pas du tout (boucle d'air sur le sommet, étape 4) et sort désormais à 3,7 m/s et 90 %. La pompe y est à l'est vers 13–14 h et remonte vers le sommet à 15 h ; celle du versant ouest, qui se construit après 14 h 30, n'est pas encore séparée : l'air de cette face courte et raide est ramené à la crête.</p>
+  <p>Défauts restants : la Vz baisse trop vite en fin d'après-midi (Jasse, Margériaz) ; la pompe « fusée » de la Tuile (5 m/s, étroite) reste sous-estimée ; les jours forts, la plupart des pompes dépassent 50 % de probabilité (d'où le curseur).</p>
   <div class="note">Un seul jour de vol : ces coefficients sont provisoires. Chaque nouveau vol (pompes trouvées, et aussi pompes cherchées sans succès) affinera les facteurs, les écarts types et la loi \(P_{\text{site}}\).</div>
 
   <h2><small>Limites</small>Ce que le modèle ne fait pas</h2>
   <ul>
-    <li>Le profil vertical vient du modèle météo, tous les 250 m au mieux : un couvercle plus fin, ou absent du modèle, échappe au calcul. Le 8 juillet, aucun des six modèles ne montrait le couvercle qui a arrêté les thermiques du Mont Saint-Michel vers 1 400 m.</li>
-    <li>Pas de dynamique propre : ni effets de foehn, ni ondes, ni brises de vallée à grande échelle (lac du Bourget, Combe de Savoie), ni rotors. Le vent près du relief est un ajustement diagnostique, pas une simulation.</li>
+    <li>Le profil vertical vient du modèle météo, tous les 250 m au mieux : un couvercle plus fin, ou absent du modèle, échappe au calcul. Le couvercle de l'air de vallée est ajouté par une règle de relief, calée sur un seul jour (Mont Saint-Michel, 8 juillet) : sa force réelle varie d'un jour à l'autre.</li>
+    <li>Pas de dynamique propre : ni effets de foehn, ni ondes, ni brises de vallée à grande échelle (lac du Bourget, Combe de Savoie) autrement que par le couvercle de vallée, ni rotors. Le vent près du relief est un ajustement diagnostique, pas une simulation.</li>
     <li>Nature du sol déduite du relief, sans carte d'occupation réelle.</li>
     <li>Thermiques supposés stationnaires sur l'heure : pas de cycle de vie, pas de rues de nuages.</li>
     <li>La qualité finale dépend d'abord de la prévision météo elle-même (nébulosité, humidité du sol, profil de température) : d'où la comparaison des modèles.</li>

@@ -78,6 +78,39 @@ h3.sub { font-size: 13px; margin: 12px 0 0; color: var(--ink); }
 .cmplegend { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 8px; font-size: 12px; color: var(--ink2); }
 .cmplegend i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 5px; }
 .feedimg { image-rendering: pixelated; }
+.muted { color: var(--muted); }
+.probrow { margin-top: 12px; }
+.probrow label { display: block; font-size: 14px; }
+.probrow output { color: var(--ink); font-weight: 700; }
+.probrow input { margin-top: 4px; }
+button.big { display: block; width: 100%; margin-top: 10px; padding: 9px 12px; border-color: var(--accent); background: #2a1c12; font-weight: 600; }
+/* fenêtre de la pompe en 3D */
+.win { position: fixed; inset: 0; z-index: 2000; background: rgba(5, 7, 8, .72); display: flex; align-items: center; justify-content: center;
+  padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); }
+.win[hidden] { display: none; }
+.winbox { width: min(1280px, 100%); height: min(860px, 100%); background: var(--surf); border: 1px solid var(--line); border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; }
+.winhead { padding: 10px 16px; border-bottom: 1px solid var(--line); }
+.winhead h2 { color: var(--ink); font-size: 14px; }
+.winbody { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 400px; }
+.view3d { display: flex; flex-direction: column; min-height: 0; padding: 12px; }
+#pump3d { flex: 1; min-height: 260px; border-radius: 8px; background: #0b0d0e; overflow: hidden; position: relative; touch-action: none; }
+#pump3d canvas { display: block; }
+#pump3d .lbl { position: absolute; transform: translate(-50%, -50%); font-size: 12px; color: #fff; text-shadow: 0 0 3px #000, 0 0 3px #000; pointer-events: none; white-space: nowrap; }
+.side3d { overflow-y: auto; padding: 12px 16px; border-left: 1px solid var(--line); min-width: 0; }
+.side3d .summary { margin-top: 0; }
+#pumpProfile, #pumpBank { width: 100%; height: auto; margin-top: 10px; display: block; border-radius: 8px; background: var(--surf2); }
+.legend3d { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 8px; font-size: 12px; color: var(--ink2); }
+.legend3d .sw { display: inline-block; width: 14px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: middle; }
+.sw.core { background: linear-gradient(90deg, #fde047, #ef4444, #7c3aed); }
+.sw.edge { background: rgba(255, 255, 255, .25); border: 1px solid rgba(255, 255, 255, .5); }
+.sw.sink { background: #3b82f6; }
+.sw.glider { background: #f97316; height: 3px; }
+.sw.feed { background: #a5f3fc; height: 3px; }
+@media (max-width: 860px) {
+  .winbody { grid-template-columns: 1fr; overflow-y: auto; }
+  .view3d { min-height: 62vh; }
+  .side3d { border-left: 0; border-top: 1px solid var(--line); overflow: visible; }
+}
 @media (max-width: 860px) {
   main { flex-direction: column; }
   #map { flex: none; height: 56vh; }

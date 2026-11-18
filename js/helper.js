@@ -10,7 +10,7 @@ self.onmessage = async e => {
     else if (m.type === "hour") {
       const F = computeHour(T, W, m.idx);
       const fl = F.flow;
-      const tr = [F.H.buffer, F.top.buffer, F.ceil.buffer, F.cu.buffer, F.climb.buffer, F.conv.buffer, F.Q.buffer, F.zl.buffer, F.fw.buffer,
+      const tr = [F.H.buffer, F.Hloc.buffer, F.top.buffer, F.ceil.buffer, F.cu.buffer, F.climb.buffer, F.conv.buffer, F.Q.buffer, F.zl.buffer, F.fw.buffer,
         F.ua.buffer, F.va.buffer, fl.down.buffer, fl.fu.buffer, fl.fv.buffer, fl.acc.buffer, fl.src.buffer];
       self.postMessage({ type: "hour", job: m.job, F }, tr);
     }

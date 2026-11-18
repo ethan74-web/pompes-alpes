@@ -2,6 +2,7 @@
 // alimentation des pompes, choix et comparaison des modèles météo.
 import { SCALES, css } from "./scales.js";
 import { addDays, isoDate, MODELS, DEFAULT_MODEL } from "./weather.js";
+import { drawBank, drawProfile, pause3D, pumpText, showPump3D } from "./pump3d.js";
 
 const $ = id => document.getElementById(id);
 const H0 = 7, H1 = 21;
@@ -15,7 +16,7 @@ const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { ret
 const st = { meta: null, date: null, hour: 14, layer: "climb", hours: new Map(), dayScores: new Map(), token: 0, point: null, playing: null,
   week: null, wanted: null, deferred: false, done: false, source: "", model: DEFAULT_MODEL, cmp: null, cmpToken: 0, feed: null };
 if (MODELS.some(m => m.id === store.get("model"))) st.model = store.get("model");
-let map, bounds, fieldLayer, windLayer, spotsLayer, namesLayer, feedLayer, baseLayers, canvas, ctx, wcanvas, wctx, worker;
+let map, bounds, fieldLayer, windLayer, spotsLayer, namesLayer, feedLayer, baseLayers, canvas, ctx, wcanvas, wctx, worker, spotRenderer;
 window.__pompes = st;                       // accès pour le débogage dans la console
 window.__feed = (i, j) => askPoint(L.latLng(...cellCenter(i, j)), false, true);
 
@@ -64,6 +65,7 @@ function onReady(meta) {
   fieldLayer = new CanvasOverlay(canvas, bounds, { opacity: 0.72, className: "field", interactive: false }).addTo(map);
   windLayer = new CanvasOverlay(wcanvas, bounds, { opacity: 0.9, interactive: false }).addTo(map);
   feedLayer = L.layerGroup().addTo(map);
+  spotRenderer = L.canvas({ padding: 0.3, tolerance: 4 });       // jusqu'à ~1 200 pompes : canvas plutôt que SVG
   spotsLayer = L.layerGroup().addTo(map);
   namesLayer = L.layerGroup(meta.places.map(p => L.marker([p.lat, p.lon], { interactive: false,
     icon: L.divIcon({ className: "", html: `<div class="place ${p.kind}">${p.name}</div>` }) }))).addTo(map);
@@ -82,7 +84,15 @@ function onReady(meta) {
     for (const x of $("layers").children) x.classList.toggle("on", x === b);
     render();
   });
-  for (const id of ["showSpots", "showWind", "showNames", "minProb"]) $(id).addEventListener("change", render);
+  for (const id of ["showSpots", "showWind", "showNames"]) $(id).addEventListener("change", render);
+  const saved = +store.get("minProb");
+  if (saved >= 0 && saved <= 95 && store.get("minProb") != null) $("minProb").value = saved;
+  $("minProbLabel").textContent = $("minProb").value + " %";
+  $("minProb").addEventListener("input", e => { $("minProbLabel").textContent = e.target.value + " %"; store.set("minProb", e.target.value); drawSpots(); });
+  $("open3d").addEventListener("click", open3D);
+  $("pumpClose").addEventListener("click", close3D);
+  $("pumpWin").addEventListener("click", e => { if (e.target === $("pumpWin")) close3D(); });
+  document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("pumpWin").hidden) close3D(); });
   $("opacity").addEventListener("input", e => fieldLayer.setOpacity(e.target.value / 100));
   $("base").addEventListener("change", e => {
     for (const k in baseLayers) map.removeLayer(baseLayers[k]);
@@ -97,7 +107,7 @@ function onReady(meta) {
   });
   $("compare").addEventListener("click", startCompare);
   $("cmpClose").addEventListener("click", () => { $("cmpBox").hidden = true; st.cmp = null; st.cmpToken++; });
-  $("pointClose").addEventListener("click", () => { st.point = null; $("pointBox").hidden = true; clearFeed(); });
+  $("pointClose").addEventListener("click", () => { st.point = null; st.pumpData = null; $("pointBox").hidden = true; clearFeed(); });
   $("daychart").addEventListener("click", e => {
     const r = e.target.getBoundingClientRect();
     st.hour = Math.min(H1, Math.max(H0, Math.floor(H0 + (e.clientX - r.left) / r.width * (H1 - H0 + 1))));
@@ -106,6 +116,9 @@ function onReady(meta) {
 
   const today = isoDate(new Date());
   $("date").max = addDays(today, 14);
+  // lien direct vers un jour : ?date=2026-07-08
+  const asked = new URLSearchParams(location.search).get("date");
+  if (asked && /^\d{4}-\d{2}-\d{2}$/.test(asked) && asked <= addDays(today, 14)) { st.wanted = asked; st.deferred = true; }
   loadWeek(today);
   setInterval(() => { if (document.visibilityState === "visible" && st.week && st.week.includes(st.date)) loadWeek(isoDate(new Date()), true); }, 3600e3);
 }
@@ -142,7 +155,7 @@ function onWorker(m) {
     for (const x of st.hours.values()) best = Math.max(best, x.stats.spotClimb);
     st.dayScores.set(st.date, best);
     paintDays();
-    if (st.week && st.weekRange) {
+    if (st.week && st.weekRange && st.week.includes(st.date)) {        // pas d'aperçu de la semaine pour un jour ancien
       const dates = st.week.filter(d => !st.dayScores.has(d));
       if (dates.length) worker.postMessage({ type: "overview", token: st.token, dates, start: st.weekRange[0], end: st.weekRange[1], model: st.model });
     }
@@ -215,7 +228,7 @@ function render() {
   drawSpots();
   if ($("showNames").checked) namesLayer.addTo(map); else map.removeLayer(namesLayer);
   drawLegend(); writeSummary(X.stats);
-  if (st.point) askPoint(st.point, true, st.feed);
+  if (st.point) askPoint(st.point, true, st.feed, st.pump);
 }
 
 function drawArrows(a) { st.arrows = a; updateWind(); }
@@ -286,32 +299,40 @@ function drawSpots() {
   spotsLayer.clearLayers();
   const X = st.hours.get(st.hour);
   if (!X || !$("showSpots").checked) return;
-  const minP = +$("minProb").value;
+  const minP = +$("minProb").value / 100;
   const rf = Math.min(1.2, Math.max(0.5, Math.pow(2, map.getZoom() - 10.5)));
-  for (const s of X.spots) {
+  const r = { renderer: spotRenderer };
+  let shown = 0;
+  // les plus probables dessinées en dernier (au-dessus)
+  for (const s of X.spots.slice().sort((a, b) => a.prob - b.prob)) {
     if (s.prob < minP) continue;
+    shown++;
     const [lat, lon] = cellCenter(s.i, s.j);
     const col = css(SCALES.climb.col(s.vz));
     const [clat, clon] = offset(lat, lon, s.ex, s.ey);
-    const zone = L.polygon(ellipse(clat, clon, s.ea, s.eb, s.eang), { color: col, weight: 1.6, opacity: 0.95, fillColor: col,
+    const zone = L.polygon(ellipse(clat, clon, s.ea, s.eb, s.eang), { ...r, color: col, weight: 1.6, opacity: 0.95, fillColor: col,
       fillOpacity: 0.10 + 0.30 * s.prob, dashArray: s.prob < 0.5 ? "4 4" : null });
     const [tlat, tlon] = offset(lat, lon, s.tx, s.ty);
-    if (Math.hypot(s.tx, s.ty) > 300) spotsLayer.addLayer(L.polyline([[lat, lon], [tlat, tlon]], { color: "#0b0d0e", weight: 3.5, opacity: 0.7, interactive: false }));
-    if (Math.hypot(s.tx, s.ty) > 300) spotsLayer.addLayer(L.polyline([[lat, lon], [tlat, tlon]], { color: col, weight: 1.6, interactive: false }));
-    const dot = L.circleMarker([lat, lon], { radius: rf * (3 + 1.2 * Math.min(5, Math.max(0, s.vz))), color: "#0b0d0e", weight: 1.3, fillColor: col, fillOpacity: 1 });
+    if (Math.hypot(s.tx, s.ty) > 300) spotsLayer.addLayer(L.polyline([[lat, lon], [tlat, tlon]], { ...r, color: "#0b0d0e", weight: 3.5, opacity: 0.7, interactive: false }));
+    if (Math.hypot(s.tx, s.ty) > 300) spotsLayer.addLayer(L.polyline([[lat, lon], [tlat, tlon]], { ...r, color: col, weight: 1.6, interactive: false }));
+    const dot = L.circleMarker([lat, lon], { ...r, radius: rf * (3 + 1.2 * Math.min(5, Math.max(0, s.vz))), color: "#0b0d0e", weight: 1.3, fillColor: col, fillOpacity: 1 });
     const w = Math.hypot(s.wu, s.wv);
     const tip = `<b>Pompe : Vz +${fr(Math.max(0, s.vz))} m/s</b> <span class="muted">(95 % : ${fr(Math.max(0, s.vzLo))} à ${fr(s.vzHi)})</span>`
       + `<br>probabilité qu'elle soit exploitable : <b>${pct(s.prob)}</b>`
       + `<br>plafond ${km(s.ceil)} m <span class="muted">(${km(s.ceilLo)} à ${km(s.ceilHi)})</span> · ${s.cu ? "cumulus" : "thermique bleu"}`
+      + `<br>spirale vers ${s.bank}°${s.bank >= 55 ? " : pompe étroite, serrer" : s.bank <= 35 ? " : pompe large" : ""}`
       + `<br>départ vers ${km(s.elev)} m · vent ${Math.round(w * 3.6)} km/h ${du(windFrom(s.wu, s.wv))}`
       + `<br>zone à 95 % : ${fr(2 * s.ea / 1000)} × ${fr(2 * s.eb / 1000)} km`
-      + (s.vz >= 3 ? `<br><span class="muted">cliquer : d'où vient son air, effet du vent</span>` : "");
+      + (s.shared > 0.1 ? `<br>air partagé avec une voisine : ${Math.round(s.shared * 100)} % de son bassin` : "")
+      + (s.lid > 0.5 ? `<br><span class="muted">sous le couvercle de l'air de vallée</span>` : "")
+      + `<br><span class="muted">cliquer : vue en 3D${s.vz >= 3 ? ", d'où vient son air, effet du vent" : ""}</span>`;
     for (const l of [zone, dot]) {
       l.bindTooltip(tip, { className: "spot", direction: "top", sticky: l === zone });
-      l.on("click", e => { L.DomEvent.stopPropagation(e); askPoint(L.latLng(lat, lon), false, s.vz >= 3); });
+      l.on("click", e => { L.DomEvent.stopPropagation(e); askPoint(L.latLng(lat, lon), false, s.vz >= 3, true); });
       spotsLayer.addLayer(l);
     }
   }
+  $("spotCount").textContent = `(${shown} sur ${X.spots.length})`;
 }
 
 function drawLegend() {
@@ -371,20 +392,26 @@ function writeSummary(s) {
 }
 
 // ---------------------------------------------------------------- diagnostic en un point
-function askPoint(latlng, keep = false, feed = false) {
+function askPoint(latlng, keep = false, feed = false, pump = false) {
   const m = st.meta;
   const i = Math.floor((latlng.lng - m.west) / (m.east - m.west) * m.nx), j = Math.floor((m.north - latlng.lat) / (m.north - m.south) * m.ny);
   if (i < 0 || j < 0 || i >= m.nx || j >= m.ny || !st.hours.has(st.hour)) return;
-  st.point = latlng; st.keep = keep; st.feed = feed;
+  st.point = latlng; st.keep = keep; st.feed = feed; st.pump = pump;
   if (!feed) clearFeed();
+  if (!pump) { st.pumpData = null; $("open3d").hidden = true; }
   $("pointBox").hidden = false;
   if (!keep) $("pointText").textContent = feed ? "Calcul de l'alimentation de la pompe…" : "Calcul…";
-  worker.postMessage({ type: "point", token: st.token, h: st.hour, i, j, feed });
+  worker.postMessage({ type: "point", token: st.token, h: st.hour, i, j, feed, pump });
 }
 
 function showPoint(D) {
   const w = Math.hypot(D.wu, D.wv), u = D.u, s = Math.hypot(D.su, D.sv);
-  $("pointTitle").textContent = D.feed ? `Pompe à ${km(D.z0)} m` : `Point à ${km(D.z0)} m`;
+  $("pointTitle").textContent = D.pump ? `Pompe à ${km(D.z0)} m` : `Point à ${km(D.z0)} m`;
+  if (D.pump) {
+    st.pumpData = { P: D.pump, feed: D.feed || null, hour: st.hour };
+    $("open3d").hidden = false;
+    if (!$("pumpWin").hidden) open3D();
+  }
   $("pointText").innerHTML = u && D.climb > 0.1
     ? `Vz au vario <b>+${fr(Math.max(0, u.vz))} m/s</b> (95 % : ${fr(Math.max(0, u.vzLo))} à ${fr(u.vzHi)}) · au cœur ${fr(u.core)} m/s<br>`
       + `${D.cu ? "base des cumulus" : "thermique bleu, plafond utilisable"} <b>${km(u.ceil)} m</b> (${km(u.ceilLo)} à ${km(u.ceilHi)}) · sommet des thermiques ${km(D.top)} m<br>`
@@ -395,6 +422,20 @@ function showPoint(D) {
   drawEmagram(D);
   if (!st.keep) $("pointBox").scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
+
+// ---------------------------------------------------------------- pompe en 3D
+function open3D() {
+  const X = st.pumpData;
+  if (!X) return;
+  const P = X.P;
+  $("pumpWin").hidden = false;
+  $("pumpTitle").textContent = `Pompe à ${km(P.z0)} m · ${labelDate(st.date)} · ${X.hour} h`;
+  $("pumpText").innerHTML = pumpText(P);
+  drawProfile($("pumpProfile"), P);
+  drawBank($("pumpBank"), P);
+  showPump3D($("pump3d"), P, X.feed).catch(e => { $("pump3d").innerHTML = `<p class="hint" style="padding:12px">Vue 3D indisponible : ${e.message}</p>`; });
+}
+function close3D() { $("pumpWin").hidden = true; pause3D(); }
 
 // ---------------------------------------------------------------- alimentation d'une pompe
 function clearFeed() { if (feedLayer) feedLayer.clearLayers(); $("feedBox").hidden = true; }
@@ -482,6 +523,11 @@ function drawEmagram(D) {
   g.textAlign = "center";
   for (let t = tmin; t <= tmax; t += 5) { g.beginPath(); g.moveTo(X(t), T0); g.lineTo(X(t), Hc - B0); g.stroke(); g.fillText(t + "°", X(t), Hc - B0 + 20); }
   g.fillStyle = col("--ground"); g.fillRect(L0, Y(D.z0), Wc - L0 - R0, Hc - B0 - Y(D.z0));
+  if (D.lid && D.lid > D.z0) {
+    g.fillStyle = "rgba(251,191,36,.16)"; g.fillRect(L0, Y(D.lid + 300), Wc - L0 - R0, Y(D.lid) - Y(D.lid + 300));
+    g.fillStyle = "#fbbf24"; g.textAlign = "right"; g.font = "13px system-ui, sans-serif";
+    g.fillText("couvercle de l'air de vallée (estimé)", Wc - R0 - 4, Y(D.lid + 300) - 5);
+  }
   if (D.climb > 0.1 && D.top > D.z0) {
     g.fillStyle = "rgba(249,115,22,.12)"; g.fillRect(L0, Y(D.top), Wc - L0 - R0, Y(D.z0) - Y(D.top));
     g.fillStyle = col("--accent"); g.textAlign = "left"; g.font = "600 14px system-ui, sans-serif";

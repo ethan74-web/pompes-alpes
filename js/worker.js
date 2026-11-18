@@ -1,5 +1,5 @@
 // Calcul en arrière-plan : la page reste fluide pendant que les heures de la journée se calculent.
-import { computeHour, feedAnalysis, loadTerrain, pointSounding, windAt } from "./model.js";
+import { computeHour, feedAnalysis, loadTerrain, pointSounding, pumpStructure, windAt } from "./model.js";
 import { SCALES } from "./scales.js";
 import { fetchRange, hourIndex, MODELS } from "./weather.js";
 
@@ -166,8 +166,12 @@ async function point(m) {
   if (!cur.hours.has(m.h)) { cur.pending.push({ kind: "point", m }); return; }
   const F = await fullHour(m.h);
   const D = pointSounding(T, F, m.i, m.j);
+  if (m.pump) D.pump = pumpStructure(T, F, m.i, m.j);
   if (m.feed) D.feed = feedAnalysis(T, F, m.i, m.j);
-  post({ type: "point", token: m.token, h: m.h, i: m.i, j: m.j, D }, D.feed ? [D.feed.raster.buffer] : []);
+  const tr = [];
+  if (D.feed) tr.push(D.feed.raster.buffer);
+  if (D.pump) tr.push(D.pump.elev.buffer, D.pump.heat.buffer);
+  post({ type: "point", token: m.token, h: m.h, i: m.i, j: m.j, D }, tr);
 }
 
 // ---------------------------------------------------------------- aperçu des autres jours

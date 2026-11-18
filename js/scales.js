@@ -14,7 +14,7 @@ export function ramp(stops) {
 const hex = h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
 
 export const SCALES = {
-  climb: { cap: "Vz au vario en spirale (45°, 90 km/h), m/s", ticks: [1, 2, 3, 4, 5, 6],
+  climb: { cap: "Vz au vario en spirale (inclinaison adaptée, 35 à 55°), m/s", ticks: [1, 2, 3, 4, 5, 6],
     col: ramp([[0.2, hex("#fff7c2")], [1, hex("#fde047")], [2, hex("#fb923c")], [3, hex("#ef4444")], [4, hex("#c026d3")], [5, hex("#7c3aed")], [6, hex("#3730a3")]]) },
   ceil: { cap: "Plafond utilisable (m, altitude)", ticks: [1200, 1800, 2400, 3000, 3600, 4200],
     col: ramp([[1200, hex("#3b82f6")], [1800, hex("#22d3ee")], [2400, hex("#4ade80")], [3000, hex("#facc15")], [3600, hex("#f97316")], [4200, hex("#dc2626")]]) },

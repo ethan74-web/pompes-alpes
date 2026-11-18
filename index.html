@@ -63,15 +63,9 @@
           <label><input type="checkbox" id="showWind" checked> Vent</label>
           <label><input type="checkbox" id="showNames" checked> Noms</label>
         </div>
-        <div class="row">
-          <label>Pompes affichées
-            <select id="minProb">
-              <option value="0">toutes</option>
-              <option value="0.3" selected>probabilité ≥ 30 %</option>
-              <option value="0.5">probabilité ≥ 50 %</option>
-              <option value="0.7">probabilité ≥ 70 %</option>
-            </select>
-          </label>
+        <div class="probrow">
+          <label for="minProb">Pompes affichées : probabilité ≥ <output id="minProbLabel">30 %</output> <span id="spotCount" class="muted"></span></label>
+          <input type="range" id="minProb" min="0" max="95" step="5" value="30" aria-label="Probabilité minimale des pompes affichées">
         </div>
         <div class="row">
           <label class="grow">Opacité <input type="range" id="opacity" min="20" max="100" value="72"></label>
@@ -89,6 +83,7 @@
       <section id="pointBox" hidden>
         <div class="row between"><h2 id="pointTitle">Point</h2><button id="pointClose" type="button" aria-label="Fermer">✕</button></div>
         <p id="pointText" class="summary"></p>
+        <button id="open3d" type="button" class="big" hidden>Voir la pompe en 3D : vitesses, inclinaison, turbulence</button>
         <div id="feedBox" hidden>
           <h3 class="sub">Alimentation de la pompe</h3>
           <p id="feedText" class="summary"></p>
@@ -96,20 +91,49 @@
           <p class="hint">Sur la carte : zone d'où vient l'air chaud qui nourrit la pompe (plus c'est clair, plus elle compte) et trajets de l'air près du sol (brises de pente + vent). La rose donne la Vz attendue dans la pompe si le vent près du relief venait de chaque direction, de 0 à 40 km/h (du centre vers l'extérieur) ; le point blanc marque le vent prévu. Comparez avec les balises en temps réel.</p>
         </div>
         <canvas id="emagram" width="640" height="420" aria-label="Profil vertical de température"></canvas>
-        <p class="hint">Vz : ce qu'indique le vario d'un planeur de classe standard spiralant à 45° d'inclinaison et 90 km/h, moyenne entre 30 et 70 % de la hauteur de la couche convective. Les fourchettes couvrent 95 % des cas simulés.</p>
+        <p class="hint">Vz : ce qu'indique le vario d'un planeur de classe standard qui spirale comme il faut — 35° (76 km/h) dans une pompe large, 45° (82 km/h) ou 55° (91 km/h) dans une pompe étroite —, moyenne entre 30 et 70 % de la hauteur de la couche convective. Les fourchettes couvrent 95 % des cas simulés.</p>
         <p class="hint">Trait plein : température de l'air · tirets bleus : point de rosée · tirets orange : particule partant du sol · bande orange : couche brassée par les thermiques. Le sommet est l'altitude où la particule, qui se mélange peu à peu à l'air ambiant, n'est plus plus légère que lui : un couvercle d'inversion l'arrête.</p>
       </section>
 
       <section class="about">
         <h2>Comment lire cette carte</h2>
         <p>Chaque heure, le site calcule l'énergie reçue par chaque pente de 150 m (soleil, ombres portées, nuages) et la chaleur que le sol rend à l'air. Les brises de pente et le vent, ajusté au relief, ramassent cette chaleur et la concentrent là où ils convergent : ce sont les <b>pompes</b>, plus fortes et plus étroites que les thermiques ordinaires autour.</p>
-        <p>L'<b>ellipse</b> est la zone où l'on a 95 % de chances de trouver le thermique en spiralant ; elle s'allonge dans le sens où le modèle hésite (le long d'une crête, sous le vent). La <b>probabilité</b> est celle que la pompe soit là et exploitable (au moins 0,5 m/s au vario et 300 m de gain). Cliquez sur une pompe de plus de 3 m/s pour voir d'où vient son air et ce qu'elle devient selon le vent.</p>
+        <p>L'<b>ellipse</b> est la zone où l'on a 95 % de chances de trouver le thermique en spiralant ; elle s'allonge dans le sens où le modèle hésite (le long d'une crête, sous le vent). La <b>probabilité</b> est celle que la pompe soit là et exploitable (au moins 0,5 m/s au vario et 300 m de gain) ; le curseur n'affiche que les pompes au-dessus du seuil choisi. Cliquez sur une pompe pour la voir en 3D (vitesses selon l'altitude, inclinaison conseillée, turbulence) ; au-dessus de 3 m/s, vous voyez aussi d'où vient son air et ce qu'elle devient selon le vent.</p>
         <p class="warn">Modèle expérimental, recalé sur un seul jour de vol pour l'instant : ordres de grandeur, pas une garantie. Il ne remplace ni un briefing météo ni votre jugement en vol.</p>
         <p class="credits">Météo : <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Relief : SRTM (NASA). Fonds : © OpenStreetMap, OpenTopoMap.</p>
         <a class="theory" href="theorie.html">Le modèle en détail</a>
       </section>
     </aside>
   </main>
+
+  <div id="pumpWin" class="win" hidden role="dialog" aria-modal="true" aria-labelledby="pumpTitle">
+    <div class="winbox">
+      <div class="row between winhead">
+        <h2 id="pumpTitle">La pompe en 3D</h2>
+        <button id="pumpClose" type="button" aria-label="Fermer">✕</button>
+      </div>
+      <div class="winbody">
+        <div class="view3d">
+          <div id="pump3d" aria-label="Pompe en trois dimensions"></div>
+          <div class="legend3d">
+            <span><i class="sw core"></i>cœur (vitesse de l'air)</span>
+            <span><i class="sw edge"></i>bord : l'air ne monte plus</span>
+            <span><i class="sw sink"></i>descendance autour</span>
+            <span><i class="sw glider"></i>spirale conseillée</span>
+            <span><i class="sw feed"></i>air qui la nourrit</span>
+          </div>
+          <p class="hint">Glisser pour tourner, molette ou pincer pour zoomer. Relief à l'échelle, ±3 km autour du départ ; la colonne penche avec le vent.</p>
+        </div>
+        <div class="side3d">
+          <p id="pumpText" class="summary"></p>
+          <canvas id="pumpProfile" width="640" height="520" aria-label="Vitesse verticale selon l'altitude"></canvas>
+          <canvas id="pumpBank" width="640" height="300" aria-label="Vz au vario selon l'inclinaison"></canvas>
+          <p class="hint">Profil idéalisé (thermique moyen d'Allen + panache de Morton, Taylor et Turner, anneau de descendance supposé rendre 40 % du débit montant). Turbulence : écart de vitesse verticale entre les deux bouts d'aile (15 m) ; les petits tourbillons ne sont pas représentés.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
   <script type="module" src="js/app.js"></script>
 </body>
