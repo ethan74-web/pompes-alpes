@@ -28,7 +28,8 @@ const cacheFirst = async req => {
 };
 const networkFirst = async req => {
   try {
-    const r = await fetch(req);
+    // revalidation auprès du serveur (le cache HTTP de GitHub Pages garderait sinon l'ancienne page 10 min)
+    const r = await fetch(req.mode === "navigate" ? new Request(req.url, { cache: "no-cache" }) : req, req.mode === "navigate" ? undefined : { cache: "no-cache" });
     if (r.ok) (await caches.open(CACHE)).put(req, r.clone());
     return r;
   } catch (e) {
