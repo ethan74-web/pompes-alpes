@@ -16,7 +16,10 @@ h2 output { color: var(--ink); font-size: 16px; margin-left: 8px; letter-spacing
 #status { font-size: 13px; color: var(--muted); text-align: right; }
 #status.err { color: #f87171; }
 main { flex: 1; display: flex; min-height: 0; }
-#map { flex: 1; min-width: 0; background: #0b0d0e; }
+#map { flex: 1; min-width: 0; background: #0b0d0e; position: relative; }
+#mapLoading { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  color: #c9d1d3; font-size: 15px; text-align: center; gap: 6px; padding: 16px; z-index: 500; pointer-events: none; }
+#mapLoading small { color: #8a9496; }
 #panel { width: 380px; flex: none; overflow-y: auto; background: var(--surf); border-left: 1px solid var(--line); }
 #panel section { padding: 14px 16px; border-bottom: 1px solid var(--line); }
 .row { display: flex; align-items: center; gap: 12px; margin-top: 10px; }

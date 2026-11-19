@@ -94,4 +94,8 @@ print("classes WorldCover (%) :", {NAMES[k]: round(100 * float(counts[:, k].sum(
 backup = os.path.join(SITE, "..", "data", "cover_relief.u8")
 if not os.path.exists(backup): shutil.copy(os.path.join(SITE, "data", "cover.u8"), backup)
 cover.tofile(os.path.join(SITE, "data", "cover.u8"))
-print("écrit data/cover.u8")
+# nouvelle version des données : le site relit le relief au lieu de garder l'ancien en cache hors réseau
+import time
+meta["dataVersion"] = time.strftime("%Y%m%d%H%M")
+json.dump(meta, open(os.path.join(SITE, "data", "meta.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+print("écrit data/cover.u8, version", meta["dataVersion"])

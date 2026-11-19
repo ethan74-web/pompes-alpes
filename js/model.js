@@ -131,9 +131,11 @@ async function get(url, kind = "arrayBuffer", tries = 5) {
 
 export async function loadTerrain(base) {
   const meta = await get(base + "meta.json", "json");
-  const elev = new Int16Array(await get(base + "elev.i16"));
-  const cover = new Uint8Array(await get(base + "cover.u8"));
-  const svf8 = new Uint8Array(await get(base + "svf.u8"));
+  // meta.json passe toujours par le réseau ; sa version force la relecture du relief gardé en cache hors réseau
+  const v = meta.dataVersion ? "?v=" + meta.dataVersion : "";
+  const elev = new Int16Array(await get(base + "elev.i16" + v));
+  const cover = new Uint8Array(await get(base + "cover.u8" + v));
+  const svf8 = new Uint8Array(await get(base + "svf.u8" + v));
   const { nx, ny, dx } = meta, n = nx * ny;
   let zmin = 1e9;
   for (let p = 0; p < n; p++) if (cover[p] && elev[p] < zmin) zmin = elev[p];

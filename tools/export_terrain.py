@@ -214,7 +214,8 @@ for name, la, lo, kind, alt in PLACES:
     places.append(dict(name=name, lat=round(float(la), 5), lon=round(float(lo), 5), kind=kind, alt=int(round(float(Zf[j0, i0])))))
 
 meta = dict(nx=nx, ny=ny, dx=DX, lat0=LAT0, lon0=LON0, west=WEST, east=float(LON0 + (x0 + nx * DX) / KX),
-            south=float(LAT0 + (y1 - ny * DX) / KY), north=NORTH, places=places)
+            south=float(LAT0 + (y1 - ny * DX) / KY), north=NORTH, places=places,
+            dataVersion=__import__("time").strftime("%Y%m%d%H%M"))  # relu par le site : invalide le cache hors réseau
 json.dump(meta, open(os.path.join(OUT, "meta.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)
 for f in sorted(os.listdir(OUT)):
     print(f"  {f:14s} {os.path.getsize(os.path.join(OUT, f)) / 1024:8.0f} ko")

@@ -62,12 +62,13 @@ async function init() {
 
 function onReady(meta) {
   st.meta = meta;
+  $("mapLoading")?.remove();
   bounds = [[meta.south, meta.west], [meta.north, meta.east]];
   map = L.map("map", { zoomSnap: 0.25, minZoom: 8, maxZoom: 14, maxBounds: L.latLngBounds(bounds).pad(0.3) });
   map.fitBounds(bounds);
   window.__map = map;
   baseLayers = {
-    relief: L.imageOverlay("data/relief.jpg", bounds, { attribution: "Relief SRTM (NASA)" }),
+    relief: L.imageOverlay("data/relief.jpg" + (meta.dataVersion ? "?v=" + meta.dataVersion : ""), bounds, { attribution: "Relief SRTM (NASA)" }),
     topo: L.tileLayer("https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png", { maxZoom: 15, attribution: "© OpenStreetMap, SRTM | © OpenTopoMap (CC-BY-SA)" }),
     osm: L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 18, attribution: "© OpenStreetMap" }),
   };

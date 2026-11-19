@@ -1,9 +1,11 @@
 // Fonctionnement hors réseau (au terrain, en montagne) : le site, le relief et la dernière météo récupérée restent
 // disponibles. Site et météo : réseau d'abord, copie en cache sinon. Archives météo, relief, bibliothèques : cache d'abord.
-const CACHE = "pompes-v1";
+// Le relief est demandé avec « ?v=version » (lue dans meta.json, toujours par le réseau) : une nouvelle version
+// est téléchargée puis remplace l'ancienne dans le cache.
+const CACHE = "pompes-v2";
 const SHELL = ["./", "index.html", "theorie.html", "style.css", "manifest.webmanifest", "icon-192.png",
   "js/app.js", "js/worker.js", "js/helper.js", "js/model.js", "js/weather.js", "js/sun.js", "js/scales.js", "js/pump3d.js", "js/igc.js",
-  "data/meta.json", "data/elev.i16", "data/cover.u8", "data/svf.u8", "data/relief.jpg",
+  "data/meta.json",
   "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css", "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"];
 
 self.addEventListener("install", e => {
@@ -17,7 +19,11 @@ const cacheFirst = async req => {
   const hit = await caches.match(req);
   if (hit) return hit;
   const r = await fetch(req);
-  if (r.ok || r.type === "opaque") (await caches.open(CACHE)).put(req, r.clone());
+  if (r.ok || r.type === "opaque") {
+    const c = await caches.open(CACHE), u = new URL(req.url);
+    if (u.search) for (const k of await c.keys(req, { ignoreSearch: true })) if (k.url !== req.url) await c.delete(k);
+    await c.put(req, r.clone());
+  }
   return r;
 };
 const networkFirst = async req => {
