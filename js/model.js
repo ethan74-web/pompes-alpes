@@ -41,10 +41,10 @@ export const PARAM = {
   // une fois centré) : voir theorie.html, « Recalage sur les traces ».
   kField: 1.2,              // rayon du thermique moyen en montagne / en plaine (Allen)
   reliefZ: [1200, 2800],    // altitudes entre lesquelles le rayon et la force passent de la valeur basse à la haute
-  kVal: 0.9,                // force des thermiques des pompes de fond de vallée (sous zVal)
+  kVal: 0.87,               // force des thermiques des pompes de fond de vallée (sous zVal)
   zVal: 1000,
-  kLow: 0.6,                // force des thermiques à reliefZ[0] ...
-  kHigh: 0.9,               // ... et à reliefZ[1] et au-dessus
+  kLow: 0.58,               // force des thermiques à reliefZ[0] ...
+  kHigh: 0.87,              // ... et à reliefZ[1] et au-dessus
   heatRef: 250,             // aplatissement du cycle de la journée : la force suit H' = heatRef (H/heatRef)^heatGam
   heatGam: 0.35,
   kPlume: 1.6,              // panache : w = kPlume · B^(1/3) · z^(-1/3) (théorie MTT : 2,55 · rendement^(1/3))
@@ -703,7 +703,30 @@ function surfaceHeat(T, W, S, idx) {
     const h = (1 - GFRAC[c]) * rn * bo / (1 + bo);
     H[p] = h > 0 ? h : 0;
   }
-  // recalage sur le flux de chaleur moyen du modèle météo, quand il le fournit
+  // Recalage sur le flux de chaleur moyen du modèle météo, quand il le fournit. Il corrige l'humidité du sol et
+  // l'évaporation du jour, qui changent peu d'une heure à l'autre. L'après-midi, on garde le rapport de l'heure du
+  // soleil le plus haut : le soir, le flux du modèle météo (relief lissé, sol à peu près plat qui se stabilise)
+  // tombe bien plus vite que celui des pentes encore au soleil, que les vols montrent actives jusque vers 19 h.
+  let { k: kApi, mine, api } = apiRatio(T, W, S, sun);
+  const iN = noonIndex(W, idx, meta);
+  if (iN < idx) { const kN = apiRatio(T, W, pointState(T, W, iN), sunAt(W, iN, meta)).k; if (kN > kApi) kApi = kN; }
+  if (kApi !== 1) for (let p = 0; p < n; p++) H[p] *= kApi;
+  return { H, sun, kApi, mine, api };
+}
+
+const sunAt = (W, idx, meta) => sunPosition(utcMillis(W, idx) - PARAM.lagMin * 60e3, meta.lat0, meta.lon0);
+/** Indice de l'heure du soleil le plus haut avant idx (idx lui-même le matin). */
+function noonIndex(W, idx, meta) {
+  let iN = idx;
+  while (iN > 0 && iN > idx - 8 && sunAt(W, iN - 1, meta).el > sunAt(W, iN, meta).el) iN--;
+  return iN;
+}
+
+/** Rapport flux du modèle météo / flux calculé ici sur un sol horizontal (ce que voit le modèle météo, relief lissé),
+ * autour de chaque point météo. 1 si le flux n'est pas fourni ou trop faible. */
+function apiRatio(T, W, S, sun) {
+  const { meta, cover, elev } = T, { nx, ny } = meta;
+  const sz = Math.sin(Math.max(0, sun.el) * Math.PI / 180), L4 = (arr, p) => lerp4(T, arr, p);
   const half = Math.round(nx / NG / 2);
   let mine = 0, api = 0, cnt = 0;
   for (let k = 0; k < S.K; k++) {
@@ -711,16 +734,24 @@ function surfaceHeat(T, W, S, idx) {
     const ci = Math.round((W.pts[k].gx + 0.5) / NG * nx), cj = Math.round((W.pts[k].gy + 0.5) / NG * ny);
     let s = 0, m = 0;
     for (let j = Math.max(0, cj - half); j < Math.min(ny, cj + half); j += 4) for (let i = Math.max(0, ci - half); i < Math.min(nx, ci + half); i += 4) {
-      const p = j * nx + i; if (cover[p]) { s += H[p]; m++; }
+      const p = j * nx + i, c = cover[p];
+      if (!c) continue;
+      m++;
+      if (c === 1 || c === 6 || sun.el <= 1) continue;
+      const snowy = elev[p] > S.snowLine && L4(S.snowAny, p) > 0.15, alb = snowy ? 0.6 : ALBEDO[c];
+      const rn = (1 - alb) * (L4(S.dni, p) * sz + L4(S.dif, p)) - (95 - 55 * L4(S.cloudLow, p) / 100);
+      let bo = BOWEN[c];
+      if (c !== 5 && c !== 7) { const sm = L4(S.soil, p); if (sm === sm) bo *= 1.5 - 0.9 * Math.min(1, Math.max(0, (sm - 0.10) / 0.25)); }
+      if (snowy) bo = 0.15;
+      const h = (1 - GFRAC[c]) * rn * bo / (1 + bo);
+      if (h > 0) s += h;
     }
     if (m < 20) continue;
     mine += s / m; api += Math.max(0, S.hApi[k]); cnt++;
   }
-  if (cnt > 0 && mine / cnt > 15) {
-    const k = Math.min(1.6, Math.max(0.4, api / mine));
-    for (let p = 0; p < n; p++) H[p] *= k;
-  }
-  return { H, sun };
+  if (!cnt) return { k: 1, mine: 0, api: 0 };
+  mine /= cnt; api /= cnt;
+  return { k: mine > 15 ? Math.min(1.6, Math.max(0.4, api / mine)) : 1, mine, api };
 }
 
 /** Calcule tous les champs pour l'heure d'indice idx. */
@@ -735,7 +766,7 @@ export function computeHour(T, W, idx) {
   const lap = k => { const t = performance.now(); ms[k] = Math.round(t - tl); tl = t; };
 
   // ---- 1 et 2 : éclairement de la pente et flux de chaleur sensible
-  const { H } = surfaceHeat(T, W, S, idx);
+  const SH0 = surfaceHeat(T, W, S, idx), { H } = SH0;
   // Mémoire de chaleur : l'après-midi, quand le chauffage baisse, la roche et l'air chaud près des pentes continuent
   // de nourrir les thermiques. On garde une part MEM de la baisse depuis l'heure précédente (le matin, rien ne change).
   if (day && sun.az > 180 && idx > 0) {
@@ -766,11 +797,16 @@ export function computeHour(T, W, idx) {
   const top = new Uint16Array(n), ceil = new Uint16Array(n), cu = new Uint8Array(n), climb = new Float32Array(n);
   const zlA = new Uint16Array(n), fwA = new Float32Array(n);
   // sommet de la particule sur une grille de 450 m (il varie lentement), interpolé ensuite
+  // L'après-midi, le modèle météo (relief lissé) refroidit l'air près du sol dès 17 – 18 h, alors que les pentes encore
+  // au soleil gardent leur air chaud : les sommets relevés sur les traces ne baissent pas. La particule part donc au
+  // moins aussi chaude qu'à l'heure du soleil le plus haut.
+  const iN = day ? noonIndex(W, idx, meta) : idx, SN = iN < idx ? pointState(T, W, iN) : null;
+  const thStart = (p, zr) => { const t = L4(S.fTh.res, p) + S.fTh.b * zr; return SN ? Math.max(t, L4(SN.fTh.res, p) + SN.fTh.b * zr) : t; };
   const CS = 3, ncx = Math.ceil(nx / CS) + 1, ncy = Math.ceil(ny / CS) + 1, topC = new Float32Array(ncx * ncy), topL = new Float32Array(ncx * ncy);
   if (day) for (let cj = 0; cj < ncy; cj++) for (let ci = 0; ci < ncx; ci++) {
     const p = Math.min(ny - 1, cj * CS) * nx + Math.min(nx - 1, ci * CS), zr = zs[p];
     const excess = PARAM.excess[0] + PARAM.excess[1] * Math.min(1, Hreg[p] / 300);   // surchauffe de la couche de surface (K)
-    const thP = L4(S.fTh.res, p) + S.fTh.b * zr + excess, rP = Math.max(2e-4, L4(S.fR.res, p) + S.fR.b * zr), k = cj * ncx + ci;
+    const thP = thStart(p, zr) + excess, rP = Math.max(2e-4, L4(S.fR.res, p) + S.fR.b * zr), k = cj * ncx + ci;
     topC[k] = parcelTop(T, S, p, zr, thP, rP);
     // même particule partant du bas d'une vallée, sous le couvercle de l'air de vallée
     topL[k] = T.lidF[p] > 0.01 && T.lidZ[p] > zr + 100 ? parcelTop(T, S, p, zr, thP, rP, T.lidZ[p], PARAM.lidDth * T.lidF[p]) : topC[k];
@@ -781,7 +817,7 @@ export function computeHour(T, W, idx) {
     top[p] = z; ceil[p] = z;
     if (!day || cover[p] === 0 || cover[p] === 1 || Hreg[p] < 25) continue;
     const excess = PARAM.excess[0] + PARAM.excess[1] * Math.min(1, Hreg[p] / 300);
-    const thP = L4(S.fTh.res, p) + S.fTh.b * zr + excess;
+    const thP = thStart(p, zr) + excess;
     const rP = Math.max(2e-4, L4(S.fR.res, p) + S.fR.b * zr);
     const i = p % nx, j = (p - i) / nx, fx = i / CS, fy = j / CS, x0 = Math.floor(fx), y0 = Math.floor(fy), ax = fx - x0, ay = fy - y0, k0 = y0 * ncx + x0;
     let zt = (topC[k0] * (1 - ax) + topC[k0 + 1] * ax) * (1 - ay) + (topC[k0 + ncx] * (1 - ax) + topC[k0 + ncx + 1] * ax) * ay;
@@ -903,7 +939,7 @@ export function computeHour(T, W, idx) {
     wave: waveDiag(S),
   };
   const wave = stats.wave.idx > 0.25 ? waveField(T, stats.wave) : null;
-  return { H: Hreg, Hloc, top, ceil, cu, climb, conv: cidx, Q, zl: zlA, fw: fwA, ua, va, flow: fl, spots: out, stats, S, wave };
+  return { kApi: SH0.kApi, H: Hreg, Hloc, top, ceil, cu, climb, conv: cidx, Q, zl: zlA, fw: fwA, ua, va, flow: fl, spots: out, stats, S, SN, wave };
 }
 
 /**
@@ -1199,7 +1235,8 @@ export function pointSounding(T, F, i, j) {
     rows.push({ z, T: th * Math.pow(pz / 1000, KAPPA) - 273.15, Td: dewFromE(r * pz / (0.622 + r)), u: prof4(T, S.uu, p, l), v: prof4(T, S.vv, p, l) });
   }
   const z0 = elev[p], zb = Math.min(z0, zs[p]);
-  const thP = lerp4(T, S.fTh.res, p) + S.fTh.b * zs[p] + PARAM.excess[0] + PARAM.excess[1] * Math.min(1, F.H[p] / 300);
+  const th0 = lerp4(T, S.fTh.res, p) + S.fTh.b * zs[p], SN = F.SN;
+  const thP = (SN ? Math.max(th0, lerp4(T, SN.fTh.res, p) + SN.fTh.b * zs[p]) : th0) + PARAM.excess[0] + PARAM.excess[1] * Math.min(1, F.H[p] / 300);
   const parcel = [];
   for (let z = z0; z <= Math.max(z0 + 100, F.top[p]); z += 100) { const pz = pStd(z) * pr; parcel.push({ z, T: thP * Math.pow(pz / 1000, KAPPA) - 273.15 }); }
   const [wu, wv] = windAt(T, S, p);
