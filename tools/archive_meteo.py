@@ -109,13 +109,14 @@ def fetch(pts, start, end, host):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--budget", type=int, default=24, help="nombre maximal de requêtes de 14 jours")
-    ap.add_argument("--flights", default=os.path.join(SITE, "calib", "igc", "catalogue.json"),
-                    help="catalogue des vols (calib/igc/catalogue.json) : leurs journées sont gardées, même hors saison ou pluvieuses")
+    ap.add_argument("--flights", nargs="*", default=[os.path.join(SITE, "calib", "igc", "catalogue.json"), os.path.join(SITE, "calib", "igc", "vols-autres.json")],
+                    help="catalogues des vols (calib/igc/catalogue.json, vols-autres.json) : leurs journées sont gardées, même hors saison ou pluvieuses")
     args = ap.parse_args()
     flights = set()
-    if args.flights and os.path.exists(args.flights):
-        flights = {dt.date.fromisoformat(c["date"]) for c in json.load(open(args.flights, encoding="utf-8")) if c["date"] != "2026-09-10"}
-        print(f"{len(flights)} journées de vol à garder")
+    for fp in args.flights or []:
+        if os.path.exists(fp):
+            flights |= {dt.date.fromisoformat(c["date"]) for c in json.load(open(fp, encoding="utf-8")) if c.get("date") and c["date"] != "2026-09-10"}
+    print(f"{len(flights)} journées de vol à garder")
     os.makedirs(OUT, exist_ok=True)
     ipath = os.path.join(OUT, "index.json")
     index = json.load(open(ipath)) if os.path.exists(ipath) else {}

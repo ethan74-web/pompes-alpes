@@ -22,6 +22,8 @@ export const SCALES = {
     col: ramp([[50, hex("#5a2412")], [150, hex("#a8401a")], [250, hex("#d95926")], [350, hex("#f0a070")], [450, hex("#fbe3cf")]]) },
   wave: { cap: "Onde de relief : où la chercher (λ/2 et 3λ/2 sous le vent des crêtes), indice", ticks: [0.1, 0.25, 0.5, 0.75, 1],
     col: ramp([[0.05, hex("#1e3a8a")], [0.3, hex("#3b82f6")], [0.6, hex("#93c5fd")], [1, hex("#ffffff")]]) },
+  ridge: { cap: "Vol de pente (vent + soleil sur la pente) : Vz en ligne droite le long du relief, m/s", ticks: [0.5, 1, 1.5, 2, 3],
+    col: ramp([[0.1, hex("#d1fae5")], [0.6, hex("#34d399")], [1.2, hex("#0ea5e9")], [2, hex("#6366f1")], [3, hex("#a21caf")]]) },
   conv: { cap: "Alimentation : chaleur collectée par les brises et le vent (indice)", ticks: [0.25, 0.5, 0.75, 1, 1.25, 1.5],
     col: ramp([[0.15, hex("#0c4a36")], [0.6, hex("#199e70")], [1.1, hex("#a9ecd2")], [1.5, hex("#ffffff")]]) },
 };

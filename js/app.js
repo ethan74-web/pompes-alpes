@@ -660,7 +660,7 @@ function drawLegend() {
   const sc = SCALES[st.layer], t = sc.ticks;
   const stops = [];
   for (let k = 0; k <= 20; k++) { const v = t[0] + (t[t.length - 1] - t[0]) * k / 20; stops.push(`${css(sc.col(v))} ${k * 5}%`); }
-  const fmt = v => st.layer === "climb" || st.layer === "conv" || st.layer === "wave" ?fr(v, v % 1 ? (v * 4 % 1 ? 2 : 1) : 0) : String(v);
+  const fmt = v => st.layer === "climb" || st.layer === "conv" || st.layer === "wave" || st.layer === "ridge" ? fr(v, v % 1 ? (v * 4 % 1 ? 2 : 1) : 0) : String(v);
   $("legend").innerHTML = `<div class="cap">${sc.cap}</div><div class="bar" style="background:linear-gradient(90deg,${stops.join(",")})"></div>
     <div class="ticks">${t.map(v => `<span>${fmt(v)}</span>`).join("")}</div>
     <div class="spots"><span class="ell"></span> pompe : zone où la trouver à 95 % (pleine si fiabilité ≥ 50 %, tiretée sinon ; affichée au zoom)
@@ -710,8 +710,9 @@ function writeSummary(s) {
   if (s.snowLine < 2600) fl.push(`neige au-dessus de ${km(s.snowLine)} m environ`);
   if (s.over && s.over.level === 2) fl.push(`cumulus très épais (${km(s.over.depth)} m) : congestus, averses ou orages probables`);
   else if (s.over && s.over.level === 1) fl.push(`cumulus épais (${km(s.over.depth)} m) : étalements ou surdéveloppements possibles`);
-  if (s.wave && s.wave.idx > 0.25) fl.push(`onde ${s.wave.idx > 0.6 ? "probable" : "possible"} : vent ${Math.round(s.wave.u * 3.6)} km/h ${du(s.wave.dir)} vers 3 000 m, air stable, longueur d'onde ~${fr(s.wave.lambda / 1000)} km${s.wave.trapped ? ", ondes en série" : ""} (calque Onde)`);
+  if (s.wave && s.wave.idx > 0.25) fl.push(`onde ${s.wave.idx > 0.6 ? "probable" : "possible"} : vent ${Math.round(s.wave.u * 3.6)} km/h ${du(s.wave.dir)} vers ${km(s.wave.z || 3000)} m, air stable, longueur d'onde ~${fr(s.wave.lambda / 1000)} km${s.wave.trapped ? ", ondes en série" : ""} (calque Onde)`);
   if (s.wave && s.wave.foehn) fl.push("foehn du sud probable : rafales et rotors dans les vallées");
+  if (s.ridge && s.ridge.dyn >= 5) fl.push(`vol de pente dynamique : jusqu'à ${fr(s.ridge.dynBest)} m/s le long des pentes au vent, ${s.ridge.dyn} km² à plus de 0,5 m/s (calque Pente)`);
   if (s.challes) {
     const [u, v] = s.challes, sp = Math.hypot(u, v), d = windFrom(u, v);
     if (sp >= 3 && d >= 135 && d <= 225 && st.hour <= 16)
@@ -747,6 +748,8 @@ function showPoint(D) {
       + `chances d'un thermique exploitable ici : ${pct(u.pdev)} · sol ${Math.round(D.H)} W/m² · alimentation ${fr(D.conv, 2)}`
       + ` · air près du sol ${Math.round(s * 3.6)} km/h ${vers((Math.atan2(D.su, D.sv) * 180 / Math.PI + 360) % 360)} · vent en altitude ${Math.round(w * 3.6)} km/h ${du(windFrom(D.wu, D.wv))}`
     : `Pas d'ascendance exploitable ici à ${st.hour} h (sol : ${Math.round(D.H)} W/m²).`;
+  if (D.ridge) $("pointText").innerHTML += `<br>vol de pente le long du relief (ligne droite, 90 km/h) : <b>${D.ridge.vz > 0 ? "+" : ""}${fr(D.ridge.vz)} m/s</b>`
+    + ` · sans soleil, il faudrait ~${D.ridge.umin} km/h de vent face à la pente (vent du modèle à la crête + 300 m)`;
   if (D.feed) drawFeed(D.feed); else $("feedBox").hidden = true;
   drawEmagram(D);
   if (!st.keep) $("pointBox").scrollIntoView({ behavior: "smooth", block: "nearest" });

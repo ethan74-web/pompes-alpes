@@ -130,7 +130,7 @@ function store(h, F) {
     if (!T.cover[p]) continue;
     surf.push(i, j, F.flow.fu[p], F.flow.fv[p]);
   }
-  cur.hours.set(h, { climb, ceil: F.ceil, H, conv, arrows, surf: new Float32Array(surf), wave: F.wave });
+  cur.hours.set(h, { climb, ceil: F.ceil, H, conv, arrows, surf: new Float32Array(surf), wave: F.wave, ridge: F.ridge });
   // champs complets gardés pour les deux dernières heures (diagnostic au clic)
   cur.full.set(h, F);
   while (cur.full.size > 2) cur.full.delete(cur.full.keys().next().value);
@@ -147,6 +147,7 @@ function render(m) {
     else if (m.layer === "ceil") { v = D.ceil[p]; a = D.climb[p] > 5 ? 1 : 0; }
     else if (m.layer === "heat") { v = D.H[p] * 2; a = Math.min(1, Math.max(0, (v - 25) / 60)); }
     else if (m.layer === "wave") { v = D.wave ? D.wave[p] / 255 : 0; a = Math.min(1, v * 2.5); }
+    else if (m.layer === "ridge") { v = D.ridge ? D.ridge[p] / 25 : 0; a = Math.min(1, Math.max(0, v / 0.3)); }
     else { v = D.conv[p] / 100; a = Math.min(1, Math.max(0, (v - 0.15) / 0.25)) * (D.H[p] > 15 ? 1 : 0); }
     if (a <= 0) continue;
     const c = sc.col(v);

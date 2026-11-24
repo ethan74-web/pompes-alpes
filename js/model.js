@@ -62,6 +62,9 @@ export const PARAM = {
   memory: 1,                // échelle de la mémoire de chaleur de l'après-midi (0 : sans)
   lagMin: 30,             // retard (min) entre la position du soleil et le flux de chaleur
   shelterDeg: [2, 14],      // abri : vent plein si le relief au vent est vu sous moins de 2°, réduit au minimum au-delà de 14°
+  // vol de pente : coefficients recalés sur le vent du modèle (calib/pente_banc.js, 24/11/2026), ligne droite à vKmh ; a : air qui monte devant les pentes de jour
+  waveHigh: [12.5, 0.8],    // onde cherchée aussi entre 3 500 et 4 500 m, plus exigeante : vent > 45 km/h, indice × 0,8 (24/11/2026)
+  ridge: { a: 0.48, b: 0.172, c: 0.10, d: 1.41, kWind: 1, dni: 850, minSlope: 0.36, vKmh: 90 },
   shelterMin: 0.1,          // part du vent qui atteint encore un versant abrité (décollement sous la crête)
   entL: 2000,               // entraînement : la particule perd son excès de chaleur sur cette distance (m)
   q0: 2e9,                  // chaleur collectée de référence (W) pour l'indice d'alimentation
@@ -398,6 +401,13 @@ function prof4(T, profs, p, l) {
   const x0 = T.wi[p * 2], y0 = T.wi[p * 2 + 1], fx = T.wf[p * 2], fy = T.wf[p * 2 + 1], k = y0 * NG + x0;
   return (profs[k][l] * (1 - fx) + profs[k + 1][l] * fx) * (1 - fy) + (profs[k + NG][l] * (1 - fx) + profs[k + NG + 1][l] * fx) * fy;
 }
+/** Vent du modèle météo (est, nord) à l'altitude z au-dessus de la maille p (profil tous les 100 m, interpolé). */
+export function windAtAlt(T, S, p, z) {
+  const f = Math.min(NZ - 1.001, Math.max(0, z / DZ)), l = Math.floor(f), a = f - l;
+  return [prof4(T, S.uu, p, l) * (1 - a) + prof4(T, S.uu, p, l + 1) * a, prof4(T, S.vv, p, l) * (1 - a) + prof4(T, S.vv, p, l + 1) * a];
+}
+/** État de l'atmosphère à l'heure idx (profils aux points du modèle météo), pour le recalage. */
+export function stateAt(T, W, idx) { return pointState(T, W, idx); }
 /** Vent (est, nord) dans la couche convective au-dessus de la maille p : celui qui fait dériver les thermiques. */
 export function windAt(T, S, p) {
   const zb = Math.min(T.elev[p], T.zs[p]);
@@ -945,7 +955,9 @@ export function computeHour(T, W, idx) {
     wave: waveDiag(S),
   };
   const wave = stats.wave.idx > 0.25 ? waveField(T, stats.wave) : null;
-  return { kApi: SH0.kApi, H: Hreg, Hloc, top, ceil, cu, climb, conv: cidx, Q, zl: zlA, fw: fwA, ua, va, flow: fl, spots: out, stats, S, SN, wave };
+  const ridge = ridgeField(T, S, sun, day);
+  stats.ridge = ridge.stats;
+  return { kApi: SH0.kApi, H: Hreg, Hloc, top, ceil, cu, climb, conv: cidx, Q, zl: zlA, fw: fwA, ua, va, flow: fl, spots: out, stats, S, SN, wave, ridge: ridge.vz, ridgeMin: ridge.umin };
 }
 
 /**
@@ -998,6 +1010,53 @@ function overDev(spots, S) {
 }
 
 /**
+ * Vol de pente (dynamique et thermodynamique), recalé sur les traces (calib/pente.py, pente_fit.py ; 3 200 fenêtres de
+ * 20 s en ligne droite à moins de 250 m d'une pente de plus de 20°, 101 jours) : vitesse verticale de l'air devant la pente
+ *   w = a + b U⊥⁺ sin α − c U⊥⁻ sin α + d cos i sin α
+ * U⊥ : vent qui monte la pente (+ face au vent), celui relevé par la dérive des spirales ≈ kWind × vent du modèle ;
+ * α : pente ; cos i : soleil direct sur la pente (× DNI / 850 W/m²). Vz du planeur en ligne droite le long de la pente
+ * = w − chute de sa polaire à vKmh. umin : vent du modèle (m/s, à l'altitude de la crête + 300 m) qu'il faudrait face à
+ * la pente pour tenir sans soleil.
+ */
+function ridgeCell(T, S, p, sv, sink) {
+  const R = PARAM.ridge, s = T.slope[p] / 100, sa = s / Math.sqrt(1 + s * s);
+  const [u, v] = windAtAlt(T, S, p, T.elev[p] + 300), sh = shelterFactor(T, p, u, v);
+  const uperp = R.kWind * sh * (u * T.up[p * 2] / 127 + v * T.up[p * 2 + 1] / 127);
+  const cosi = sv ? Math.max(0, (T.normal[p * 3] * sv[0] + T.normal[p * 3 + 1] * sv[1] + T.normal[p * 3 + 2] * sv[2]) / 127) * Math.min(1.2, lerp4(T, S.dni, p) / R.dni) : 0;
+  const w = (sv ? R.a : 0) + R.b * Math.max(0, uperp) * sa - R.c * Math.max(0, -uperp) * sa + R.d * cosi * sa;
+  return { vz: w - sink, w, uperp, cosi, sa, dyn: R.b * Math.max(0, uperp) * sa, umin: sink / (R.b * R.kWind * sa) };      // umin : dynamique pur, sans soleil
+}
+function sunVec(sun, day) {
+  if (!day || sun.el <= 1) return null;
+  const el = sun.el * Math.PI / 180, az = sun.az * Math.PI / 180;
+  return [Math.cos(el) * Math.sin(az), Math.cos(el) * Math.cos(az), Math.sin(el)];
+}
+const ridgeSink = () => { const V = PARAM.ridge.vKmh / 3.6; return PARAM.polarA * V ** 3 + PARAM.polarB / V; };
+function ridgeField(T, S, sun, day) {
+  const { n } = T, R = PARAM.ridge, sv = sunVec(sun, day), sink = ridgeSink();
+  const vz = new Int8Array(n), umin = new Uint8Array(n);
+  let best = 0, cells = 0, dcells = 0, dbest = 0;
+  for (let p = 0; p < n; p++) {
+    if (!T.cover[p] || T.slope[p] / 100 < R.minSlope) continue;
+    const c = ridgeCell(T, S, p, sv, sink);
+    vz[p] = Math.max(-127, Math.min(127, Math.round(c.vz * 25)));
+    umin[p] = Math.min(255, Math.round(c.umin * 3.6));
+    if (c.vz > 0.5) cells++;
+    if (c.vz > 0.5 && c.dyn > 0.4) { dcells++; if (c.vz > dbest) dbest = c.vz; }
+    if (c.vz > best) best = c.vz;
+  }
+  const a2 = T.meta.dx * T.meta.dx / 1e6;
+  // dyn : pentes où le vent compte (≥ 0,4 m/s de la montée de l'air), pour l'alerte du jour
+  return { vz, umin, stats: { best: +best.toFixed(1), km2: Math.round(cells * a2), dyn: Math.round(dcells * a2), dynBest: +dbest.toFixed(1) } };
+}
+/** Vol de pente en un point (recalage) : Vz du planeur, vitesse de l'air, vent face à la pente, soleil, vent mini. */
+export function ridgeAt(T, W, idx, p, S = pointState(T, W, idx)) {
+  const meta = T.meta;
+  const sun = sunPosition(utcMillis(W, idx) - PARAM.lagMin * 60e3, meta.lat0, meta.lon0);
+  return ridgeCell(T, S, p, sunVec(sun, sun.el > 1), ridgeSink());
+}
+
+/**
  * Onde de relief (théorie linéaire). Profil moyen du domaine : fréquence de Brunt-Väisälä N² = (g/θ) dθ/dz et vent U
  * dans la couche des crêtes (2 500 – 3 500 m) et au-dessus (4 000 – 5 500 m). Nombre de Froude Fr = U/(N h), h = 1 500 m ;
  * paramètre de Scorer l² = N²/U² : des ondes piégées (en série sous le vent) quand il décroît avec l'altitude ;
@@ -1008,17 +1067,24 @@ function waveDiag(S) {
   const K = S.K, at = (prof, l) => { let s = 0; for (let k = 0; k < K; k++) s += prof[k][l]; return s / K; };
   const th = l => at(S.th, l), u = l => at(S.uu, l), v = l => at(S.vv, l), U = l => Math.hypot(u(l), v(l));
   const N2 = (l1, l2) => 9.81 / th((l1 + l2) >> 1) * (th(l2) - th(l1)) / ((l2 - l1) * DZ);
-  const nLow = Math.sqrt(Math.max(1e-8, N2(25, 35))), nUp = Math.sqrt(Math.max(1e-8, N2(40, 55)));
-  const uLow = (U(25) + U(30) + U(35)) / 3, uUp = (U(45) + U(50) + U(55)) / 3;
-  const dir = (Math.atan2(-u(30), -v(30)) * 180 / Math.PI + 360) % 360;
-  const fr = uLow / (nLow * 1500), lam = 2 * Math.PI * uLow / nLow;
-  const trapped = nLow * nLow / (uLow * uLow + 1) > 1.3 * nUp * nUp / (uUp * uUp + 1);
-  // crêtes des Préalpes orientées vers le nord-nord-est (vent d'ouest ou d'est le plus efficace), chaîne principale et
-  // Belledonne vers le nord-est (vent de nord-ouest ou de sud-est) : on garde la plus favorable des deux
-  const perp = Math.max(0.3, Math.abs(Math.cos((dir - 290) * Math.PI / 180)), Math.abs(Math.cos((dir - 315) * Math.PI / 180)));
-  const idx = clip01((uLow - 8) / 7) * clip01((nLow - 0.004) / 0.006) * Math.exp(-((Math.log(Math.max(0.05, fr) / 0.8) / 0.9) ** 2)) * (trapped ? 1 : 0.6) * perp;
-  const foehn = dir >= 150 && dir <= 240 && uLow >= 12 && nLow > 0.005;
-  return { idx, lambda: lam, u: uLow, uUp, n: nLow, fr, dir, trapped, foehn };
+  // deux couches : 2 500 – 3 500 m (crêtes des Préalpes et de Belledonne) et 3 500 – 4 500 m (au-dessus de la couche
+  // convective des soirs d'été, crêtes de 2 500 à 3 000 m : onde relevée à 4 400 m le 21/07/2026 avec 5 m/s plus bas)
+  const layer = (l0, l1, lu0, lu1, u0 = 8, k = 1) => {
+    const nLow = Math.sqrt(Math.max(1e-8, N2(l0, l1))), nUp = Math.sqrt(Math.max(1e-8, N2(lu0, lu1)));
+    const lm = (l0 + l1) >> 1, uLow = (U(l0) + U(lm) + U(l1)) / 3, uUp = (U(lu0) + U((lu0 + lu1) >> 1) + U(lu1)) / 3;
+    const dir = (Math.atan2(-u(lm), -v(lm)) * 180 / Math.PI + 360) % 360;
+    const fr = uLow / (nLow * 1500), lam = 2 * Math.PI * uLow / nLow;
+    const trapped = nLow * nLow / (uLow * uLow + 1) > 1.3 * nUp * nUp / (uUp * uUp + 1);
+    // crêtes des Préalpes orientées vers le nord-nord-est (vent d'ouest ou d'est le plus efficace), chaîne principale et
+    // Belledonne vers le nord-est (vent de nord-ouest ou de sud-est) : on garde la plus favorable des deux
+    const perp = Math.max(0.3, Math.abs(Math.cos((dir - 290) * Math.PI / 180)), Math.abs(Math.cos((dir - 315) * Math.PI / 180)));
+    const idx = k * clip01((uLow - u0) / 7) * clip01((nLow - 0.004) / 0.006) * Math.exp(-((Math.log(Math.max(0.05, fr) / 0.8) / 0.9) ** 2)) * (trapped ? 1 : 0.6) * perp;
+    return { idx, lambda: lam, u: uLow, uUp, n: nLow, fr, dir, trapped, z: lm * DZ };
+  };
+  const lo = layer(25, 35, 40, 55), hi = PARAM.waveHigh ? layer(35, 45, 48, 58, PARAM.waveHigh[0], PARAM.waveHigh[1]) : { idx: 0 };
+  const W = hi.idx > lo.idx ? hi : lo;
+  W.foehn = lo.dir >= 150 && lo.dir <= 240 && lo.u >= 12 && lo.n > 0.005;
+  return W;
 }
 
 /** Zones où chercher l'onde : à λ/2 et 3λ/2 sous le vent des crêtes exposées (indice 0 – 255 par maille). */
@@ -1249,5 +1315,6 @@ export function pointSounding(T, F, i, j) {
   let u = null;
   if (F.climb[p] > 0) u = uncertainty({ z: z0, zb, zi: F.top[p] - zb, H: F.H[p], B: G_RCP * F.Q[p], kf: reliefGain(z0), cu: F.cu[p], zl: F.zl[p], wu, wv, fw: F.fw[p], cov: [0, 0, 0] }, p * 31 + 7);
   return { rows, parcel, z0, top: F.top[p], ceil: F.ceil[p], cu: F.cu[p], climb: F.climb[p], H: F.H[p], conv: F.conv[p], Q: F.Q[p],
-    wu, wv, su: F.flow.fu[p], sv: F.flow.fv[p], u, lid: T.lidF[p] > 0.3 ? T.lidZ[p] : 0 };
+    wu, wv, su: F.flow.fu[p], sv: F.flow.fv[p], u, lid: T.lidF[p] > 0.3 ? T.lidZ[p] : 0,
+    ridge: F.ridge && T.slope[p] / 100 >= PARAM.ridge.minSlope ? { vz: F.ridge[p] / 25, umin: F.ridgeMin[p] } : null };
 }
