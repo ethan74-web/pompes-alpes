@@ -43,6 +43,7 @@ export const PARAM = {
   reliefZ: [1200, 2800],    // altitudes entre lesquelles le rayon et la force passent de la valeur basse à la haute
   kVal: 0.9,                // force des thermiques des pompes de fond de vallée (sous zVal)
   zVal: 1000,
+  kPlain: 0.85, plainZ: [1300, 1600],   // plaine : force × 0,85 pour les départs sous 1 000 – 1 300 m, sans sommet de 1 600 m à 8 km
   kLow: 0.58,               // force des thermiques à strengthZ[0] ...
   kHigh: 0.75,              // ... et à strengthZ[1] et au-dessus (19/11 : 0,87 à 2 800 m surestimait de 0,4–0,6 m/s au-dessus de 2 200 m)
   strengthZ: [1200, 2100],
@@ -63,8 +64,8 @@ export const PARAM = {
   lagMin: 30,             // retard (min) entre la position du soleil et le flux de chaleur
   shelterDeg: [2, 14],      // abri : vent plein si le relief au vent est vu sous moins de 2°, réduit au minimum au-delà de 14°
   // vol de pente : coefficients recalés sur le vent du modèle (calib/pente_banc.js, 24/11/2026), ligne droite à vKmh ; a : air qui monte devant les pentes de jour
-  waveHigh: [12.5, 0.8],    // onde cherchée aussi entre 3 500 et 4 500 m, plus exigeante : vent > 45 km/h, indice × 0,8 (24/11/2026)
-  ridge: { a: 0.48, b: 0.172, c: 0.10, d: 1.41, kWind: 1, dni: 850, minSlope: 0.36, vKmh: 90 },
+  waveHigh: null,           // [12.5, 0.8] : onde cherchée aussi entre 3 500 et 4 500 m (vent > 45 km/h) — essayé le 24/11/2026, non confirmé par les vols : désactivé
+  ridge: { a: 0.56, b: 0.151, c: 0.147, d: 1.30, kWind: 1, dni: 850, minSlope: 0.36, vKmh: 90 },
   shelterMin: 0.1,          // part du vent qui atteint encore un versant abrité (décollement sous la crête)
   entL: 2000,               // entraînement : la particule perd son excès de chaleur sur cette distance (m)
   q0: 2e9,                  // chaleur collectée de référence (W) pour l'indice d'alimentation
@@ -246,7 +247,16 @@ export async function loadTerrain(base) {
       lidF[p] = clip01((D - 500) / 400) * clip01((en - 0.05) / 0.15) * clip01((0.5 - hs) / 0.15);
     }
   }
-  return { meta, n, elev: E, cover, svf, normal, up, slope, curv, osS, smax, shelter, wi, wf, zs, lidZ, lidF };
+  // plaine (avant-pays, Bas-Dauphiné, Bugey bas) : aucun sommet de PARAM.plainZ m à moins de 8 km ; poids 0 – 1.
+  // Max glissant séparable sur une grille 3 × plus grossière (fenêtre ±8 km).
+  const PC = 3, pcx = Math.ceil(nx / PC), pcy = Math.ceil(ny / PC), cm = new Float32Array(pcx * pcy).fill(-1e9);
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const q = Math.floor(j / PC) * pcx + Math.floor(i / PC); if (E[j * nx + i] > cm[q]) cm[q] = E[j * nx + i]; }
+  const Rw = Math.round(8000 / (dx * PC)), tmp = new Float32Array(pcx * pcy), mx = new Float32Array(pcx * pcy);
+  for (let j = 0; j < pcy; j++) for (let i = 0; i < pcx; i++) { let m = -1e9; for (let k = Math.max(0, i - Rw); k <= Math.min(pcx - 1, i + Rw); k++) m = Math.max(m, cm[j * pcx + k]); tmp[j * pcx + i] = m; }
+  for (let i = 0; i < pcx; i++) for (let j = 0; j < pcy; j++) { let m = -1e9; for (let k = Math.max(0, j - Rw); k <= Math.min(pcy - 1, j + Rw); k++) m = Math.max(m, tmp[k * pcx + i]); mx[j * pcx + i] = m; }
+  const plain = new Float32Array(n);
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) plain[j * nx + i] = clip01((PARAM.plainZ[1] - mx[Math.floor(j / PC) * pcx + Math.floor(i / PC)]) / (PARAM.plainZ[1] - PARAM.plainZ[0]));
+  return { meta, n, elev: E, cover, svf, normal, up, slope, curv, osS, smax, shelter, wi, wf, zs, lidZ, lidF, plain };
 }
 
 const clip01 = x => (x < 0 ? 0 : x > 1 ? 1 : x);
@@ -551,10 +561,12 @@ export function reliefGain(z) {
  * Facteur de force des thermiques (thermique moyen et panache) selon l'altitude du départ, recalé sur les traces :
  * kVal pour les pompes de fond de vallée (sous zVal, raccord sur 100 m), puis de kLow à kHigh entre strengthZ.
  */
-export function strengthGain(z) {
+export function strengthGain(z, plain = 0) {
   const g = clip01((z - PARAM.strengthZ[0]) / (PARAM.strengthZ[1] - PARAM.strengthZ[0])), m = PARAM.kLow + (PARAM.kHigh - PARAM.kLow) * g;
   const t = clip01((z - (PARAM.zVal - 50)) / 100);
-  return PARAM.kVal * (1 - t) + m * t;
+  // pompes basses de plaine (traces du 24/11/2026 : +0,5 m/s sans sommet de 1 600 m à 8 km) : force × kPlain
+  const pl = 1 - (1 - PARAM.kPlain) * plain * clip01((1300 - z) / 300);
+  return (PARAM.kVal * (1 - t) + m * t) * pl;
 }
 /** Flux de flottabilité du panache, ramené vers bRef (recalé sur les traces : voir PARAM.bExp). */
 export function plumeFlux(B) {
@@ -634,7 +646,7 @@ export function uncertainty(s, seed, N = 200) {
     const fH = Math.exp(0.25 * n()), fZ = Math.exp(0.15 * n()), fa = Math.exp(0.35 * n()), fr = Math.exp(0.25 * n()), sink = 0.1 * n();
     const fs = Math.exp(0.15 * n());
     const zi = s.zi * fZ, hf = heatFlat(s.H * fH), wst = Math.cbrt(9.81 / 300 * s.H * fH * hf / 1105 * zi);
-    const [v, a, c0, bi] = thermal(wst, zi, plumeFlux(s.B * fH) * hf, s.kf, fa, fr, sink, s.fw * fs * strengthGain(s.z));
+    const [v, a, c0, bi] = thermal(wst, zi, plumeFlux(s.B * fH) * hf, s.kf, fa, fr, sink, s.fw * fs * strengthGain(s.z, s.plain || 0));
     bankCount[bi]++;
     const top = s.zb + zi;
     const ceil = Math.max(s.z, s.cu ? Math.min(s.zl + 250 * n(), top) : s.zb + PARAM.ceilFrac * zi);
@@ -857,7 +869,7 @@ export function computeHour(T, W, idx) {
     if (L4(S.rain, p) > 0.3) fw *= 0.35;                               // averses
     fwA[p] = fw;
     const hf = heatFlat(Hreg[p]), wstar = Math.cbrt(9.81 / 300 * Hreg[p] * hf / 1105 * zi);
-    climb[p] = Math.max(0, thermal(wstar, zi, plumeFlux(G_RCP * Q[p]) * hf, reliefGain(z), 1, 1, 0, fw * strengthGain(z))[0]);
+    climb[p] = Math.max(0, thermal(wstar, zi, plumeFlux(G_RCP * Q[p]) * hf, reliefGain(z), 1, 1, 0, fw * strengthGain(z, T.plain[p]))[0]);
     if (ceil[p] < z + 150) climb[p] = 0;                               // rien d'exploitable sous 150 m de gain
   }
   lap("thermiques");
@@ -913,7 +925,7 @@ export function computeHour(T, W, idx) {
     const prom = Math.max(0, 1 - (nr ? ring / nr : 0) / c.s);         // la pompe ressort-elle de son voisinage ?
     const z = elev[p], zb = Math.min(z, zs[p]);
     const [wu, wv] = windAt(T, S, p);
-    const u = uncertainty({ z, zb, zi: top[p] - zb, H: Hreg[p], B: G_RCP * Qs, kf: reliefGain(z), cu: cu[p], zl: zlA[p], wu, wv, fw: fwA[p], cov }, p * 31 + idx);
+    const u = uncertainty({ z, zb, zi: top[p] - zb, H: Hreg[p], B: G_RCP * Qs, kf: reliefGain(z), cu: cu[p], zl: zlA[p], wu, wv, fw: fwA[p], cov, plain: T.plain[p] }, p * 31 + idx);
     // le déclenchement est d'autant plus sûr que l'alimentation est forte et que la pompe ressort de son voisinage ;
     // un sommet ou un éperon bien bombé fixe le déclenchement (« pompe maison » : chapelle du MSM, Penay)
     const trig = clip01((T.curv[p] - PARAM.trigCurv[0]) / (PARAM.trigCurv[1] - PARAM.trigCurv[0]));
@@ -921,7 +933,7 @@ export function computeHour(T, W, idx) {
     const psite = pfeed + Math.max(0, 0.92 - pfeed) * PARAM.trigW * trig;
     const prob = Math.min(0.95, Math.max(0.02, u.pdev * psite));
     // ingrédients de la Vz (pour le recalage rapide sur les traces de vol)
-    const ziS = top[p] - zb, diag = { H: Hreg[p], zi: ziS, B: G_RCP * Qs, z, fw: fwA[p] };
+    const ziS = top[p] - zb, diag = { H: Hreg[p], zi: ziS, B: G_RCP * Qs, z, fw: fwA[p], plain: +T.plain[p].toFixed(2) };
     return { i: c.i, j: c.j, score: c.s, elev: z, cu: cu[p], depth: cu[p] ? Math.max(0, top[p] - zlA[p]) : 0, diag, conv: ci, convAlone: cidx[p], shared: SH.shared[k], qs: Qs, h: Hreg[p], wu, wv, prob, psite, trig, lid: T.lidF[p], ...u };
   });
 
@@ -1153,7 +1165,7 @@ export function feedAnalysis(T, F, i, j) {
   const paths = starts.map(q => { const pts = []; let c = q, k = 0; while (c >= 0 && k <= fl.it + 1) { pts.push(i0 + (c % w), j0 + Math.floor(c / w)); if (near(c)) break; c = fl.down[c]; k++; } return pts; });
   // rose des vents : vent uniforme imposé dans la fenêtre (direction d'où il vient, force en km/h)
   const z = T.elev[p0], zb = Math.min(z, T.zs[p0]), zi = Math.max(250, F.top[p0] - zb);
-  const hf = heatFlat(F.H[p0]), wstar = Math.cbrt(9.81 / 300 * F.H[p0] * hf / 1105 * zi), kf = reliefGain(z), sg = strengthGain(z);
+  const hf = heatFlat(F.H[p0]), wstar = Math.cbrt(9.81 / 300 * F.H[p0] * hf / 1105 * zi), kf = reliefGain(z), sg = strengthGain(z, T.plain[p0]);
   const speeds = [0, 10, 20, 30, 40], dirs = 16, rose = [];
   const vzAt = (Qmax, U) => {
     let fw = (F.fw[p0] || 1) * sg;
@@ -1187,7 +1199,7 @@ export function pumpStructure(T, F, i, j) {
   const { nx, ny, dx } = T.meta, p = j * nx + i, S = F.S;
   const spot = F.spots.find(s => s.i === i && s.j === j);
   const z0 = T.elev[p], zb = Math.min(z0, T.zs[p]), zi = Math.max(250, F.top[p] - zb);
-  const H = F.H[p], hf = heatFlat(H), wstar = Math.cbrt(9.81 / 300 * H * hf / 1105 * zi), kf = reliefGain(z0), fw = (F.fw[p] || 1) * strengthGain(z0);
+  const H = F.H[p], hf = heatFlat(H), wstar = Math.cbrt(9.81 / 300 * H * hf / 1105 * zi), kf = reliefGain(z0), fw = (F.fw[p] || 1) * strengthGain(z0, T.plain[p]);
   const Qs = spot ? spot.qs : F.Q[p], B = plumeFlux(G_RCP * Qs) * hf;
   const ceil = spot ? spot.ceil : F.ceil[p];
   const ring = PARAM.ringFrac * 0.44;
@@ -1313,7 +1325,7 @@ export function pointSounding(T, F, i, j) {
   for (let z = z0; z <= Math.max(z0 + 100, F.top[p]); z += 100) { const pz = pStd(z) * pr; parcel.push({ z, T: thP * Math.pow(pz / 1000, KAPPA) - 273.15 }); }
   const [wu, wv] = windAt(T, S, p);
   let u = null;
-  if (F.climb[p] > 0) u = uncertainty({ z: z0, zb, zi: F.top[p] - zb, H: F.H[p], B: G_RCP * F.Q[p], kf: reliefGain(z0), cu: F.cu[p], zl: F.zl[p], wu, wv, fw: F.fw[p], cov: [0, 0, 0] }, p * 31 + 7);
+  if (F.climb[p] > 0) u = uncertainty({ z: z0, zb, zi: F.top[p] - zb, H: F.H[p], B: G_RCP * F.Q[p], kf: reliefGain(z0), cu: F.cu[p], zl: F.zl[p], wu, wv, fw: F.fw[p], cov: [0, 0, 0], plain: T.plain[p] }, p * 31 + 7);
   return { rows, parcel, z0, top: F.top[p], ceil: F.ceil[p], cu: F.cu[p], climb: F.climb[p], H: F.H[p], conv: F.conv[p], Q: F.Q[p],
     wu, wv, su: F.flow.fu[p], sv: F.flow.fv[p], u, lid: T.lidF[p] > 0.3 ? T.lidZ[p] : 0,
     ridge: F.ridge && T.slope[p] / 100 >= PARAM.ridge.minSlope ? { vz: F.ridge[p] / 25, umin: F.ridgeMin[p] } : null };
