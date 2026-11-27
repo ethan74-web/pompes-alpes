@@ -12,9 +12,10 @@ IGC = os.path.join(ROOT, "calib", "igc")
 OUT = os.path.join(ROOT, "data", "vols")
 STEP = 3
 
+# pilotes désignés par leurs initiales (prénom + 3 premières lettres du nom), à la demande de l'auteur du site
 PILOTES = {
-    "a": "Auteur du site", "b": "Enno Adema", "c": "Fabrice Pouillard", "d": "Jean-Dominique Berti",
-    "e": "Lionel Graire", "f": "Jean-Jacques Bodenmann", "g": "Denis Hyvert", "h": "Eric Schaffter",
+    "a": "EGon", "b": "EAde", "c": "FPou", "d": "JDBer",
+    "e": "LGra", "f": "JJBod", "g": "DHyv", "h": "ESch",
 }
 
 
