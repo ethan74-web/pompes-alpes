@@ -16,7 +16,24 @@ h2 output { color: var(--ink); font-size: 16px; margin-left: 8px; letter-spacing
 #status { font-size: 13px; color: var(--muted); text-align: right; }
 #status.err { color: #f87171; }
 main { flex: 1; display: flex; min-height: 0; }
+#mapWrap { flex: 1; min-width: 0; position: relative; display: flex; }
 #map { flex: 1; min-width: 0; background: #0b0d0e; position: relative; }
+#view3d { position: absolute; inset: 0; z-index: 1100; background: #0b0d0e; overflow: hidden; touch-action: none; }
+#view3d[hidden] { display: none; }
+#view3d canvas { display: block; }
+#view3d .lbl { position: absolute; transform: translate(-50%, -100%); font-size: 12px; color: #fff; text-shadow: 0 0 3px #000, 0 0 3px #000, 0 0 2px #000; pointer-events: none; white-space: nowrap; font-weight: 600; }
+#replayBar { position: absolute; left: max(10px, env(safe-area-inset-left)); right: max(10px, env(safe-area-inset-right)); bottom: max(10px, env(safe-area-inset-bottom)); z-index: 1200;
+  background: rgba(17, 20, 22, .92); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; box-shadow: 0 4px 18px rgba(0, 0, 0, .45); }
+#replayBar[hidden] { display: none; }
+.rprow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.rprow input[type=range] { flex: 1 1 160px; min-width: 120px; width: auto; }
+#rpPlay { min-width: 40px; font-weight: 700; border-color: var(--accent); background: #2a1c12; }
+#rpClock { font-variant-numeric: tabular-nums; font-weight: 700; min-width: 64px; }
+#rp3d.on { border-color: var(--accent); background: #2a1c12; font-weight: 700; }
+.rpinfo { margin-top: 6px; font-size: 13px; color: var(--ink2); font-variant-numeric: tabular-nums; line-height: 1.4; }
+.rpinfo b { color: var(--ink); }
+.rpinfo .pred { color: #fdba74; }
+.glider-ico { pointer-events: none; }
 #mapLoading { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
   color: #c9d1d3; font-size: 15px; text-align: center; gap: 6px; padding: 16px; z-index: 500; pointer-events: none; }
 #mapLoading small { color: #8a9496; }
@@ -129,7 +146,9 @@ button.big { display: block; width: 100%; margin-top: 10px; padding: 9px 12px; b
 }
 @media (max-width: 860px) {
   main { flex-direction: column; }
-  #map { flex: none; height: 56vh; }
+  #mapWrap { flex: none; height: 62vh; }
+  #replayBar { left: 6px; right: 6px; bottom: 6px; padding: 6px 8px; }
+  .rpinfo { font-size: 12px; }
   #panel { width: auto; border-left: 0; border-top: 1px solid var(--line); }
   h1 span { display: none; }
 }

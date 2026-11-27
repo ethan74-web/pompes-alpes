@@ -19,7 +19,28 @@
     <div id="status" role="status">Chargement…</div>
   </header>
   <main>
-    <div id="map" aria-label="Carte de prévision"><div id="mapLoading">Chargement du relief et de la météo…<br><small>quelques secondes, plus au premier passage</small></div></div>
+    <div id="mapWrap">
+      <div id="map" aria-label="Carte de prévision"><div id="mapLoading">Chargement du relief et de la météo…<br><small>quelques secondes, plus au premier passage</small></div></div>
+      <div id="view3d" hidden aria-label="Rejeu du vol en trois dimensions"></div>
+      <div id="replayBar" hidden>
+        <div class="rprow">
+          <button id="rpPlay" type="button" aria-label="Lancer le rejeu">▶</button>
+          <select id="rpSpeed" aria-label="Vitesse du rejeu">
+            <option value="10">× 10</option>
+            <option value="30">× 30</option>
+            <option value="60" selected>× 60</option>
+            <option value="150">× 150</option>
+            <option value="400">× 400</option>
+          </select>
+          <button id="rpNext" type="button" title="Aller à la spirale suivante">⏭ spirale</button>
+          <output id="rpClock">–</output>
+          <input type="range" id="rpTime" min="0" max="1000" value="0" aria-label="Instant du vol">
+          <button id="rp3d" type="button" title="Basculer entre la carte et la vue 3D">3D</button>
+          <label title="La carte ou la caméra suivent le planeur"><input type="checkbox" id="rpFollow" checked> Suivre</label>
+        </div>
+        <div id="rpInfo" class="rpinfo"></div>
+      </div>
+    </div>
     <aside id="panel">
       <section>
         <div class="row between">
@@ -79,10 +100,15 @@
 
       <section>
         <div class="row between">
-          <h2>Mes vols</h2>
+          <h2>Vols et rejeu</h2>
           <button id="flightClear" type="button" hidden>Effacer</button>
         </div>
-        <label class="filepick">Trace IGC (WeGlide, SeeYou…) <input type="file" id="igc" accept=".igc,.IGC" multiple></label>
+        <div id="baseBox" hidden>
+          <div class="row"><label class="grow">Pilote <select id="volPilot" class="grow"></select></label></div>
+          <div class="row"><label class="grow">Vol <select id="volSel" class="grow"></select></label></div>
+          <p class="hint">Vols de la base qui a servi à recaler le modèle. Choisissez-en un : la prévision du jour est recalculée, puis ▶ rejoue le vol en accéléré avec les pompes prévues heure par heure, sur la carte ou en 3D.</p>
+        </div>
+        <label class="filepick">Ou votre trace IGC (WeGlide, SeeYou…) <input type="file" id="igc" accept=".igc,.IGC" multiple></label>
         <div id="flightList" class="flightlist"></div>
         <p id="flightText" class="summary"></p>
         <div id="flightTable" class="tbl"></div>
@@ -142,6 +168,7 @@
       <section class="about">
         <h2>Comment lire cette carte</h2>
         <p>Chaque heure, le site calcule l'énergie reçue par chaque pente de 150 m (soleil, ombres portées, nuages) et la chaleur que le sol rend à l'air. Les brises de pente et le vent, ajusté au relief, ramassent cette chaleur et la concentrent là où ils convergent : ce sont les <b>pompes</b>, plus fortes et plus étroites que les thermiques ordinaires autour.</p>
+        <p>Dans <b>Vols et rejeu</b>, choisissez un pilote et un jour (ou chargez votre trace) puis ▶ : le planeur avance en accéléré avec les pompes prévues heure par heure, sur la carte ou en 3D (relief à l'échelle, chaque pompe tracée du départ au plafond, penchée par le vent). Le bandeau compare en direct la Vz relevée à la pompe prévue la plus proche.</p>
         <p>L'<b>ellipse</b> est la zone où l'on a 95 % de chances de trouver le thermique en spiralant ; elle s'allonge dans le sens où le modèle hésite (le long d'une crête, sous le vent). La <b>fiabilité</b> classe chaque pompe parmi ses voisines à moins de 15 km (alimentation, relief qui fixe le déclenchement), multipliée par la part des cas simulés où elle est exploitable (au moins 0,5 m/s au vario et 300 m de gain) : chaque secteur garde ses pompes les plus sûres, et une journée faible reste faible. Ce n'est pas encore une fréquence mesurée : elle sera recalée sur des traces de vol. Le curseur n'affiche que les pompes au-dessus du seuil choisi. Cliquez sur une pompe pour la voir en 3D (vitesses selon l'altitude, inclinaison conseillée, turbulence) ; au-dessus de 3 m/s, vous voyez aussi d'où vient son air et ce qu'elle devient selon le vent.</p>
         <p class="warn">Modèle expérimental, recalé sur les traces de vol de deux pilotes de Challes (vario moyen juste en moyenne, à ± 0,8 m/s pompe par pompe ; plafonds bien suivis) : ordres de grandeur, pas une garantie. Il ne remplace ni un briefing météo ni votre jugement en vol.</p>
         <p class="credits">Météo : <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Relief : SRTM (NASA). Nature du sol : © ESA WorldCover project 2021, données Copernicus Sentinel modifiées (CC BY 4.0). Fonds : © OpenStreetMap, OpenTopoMap. Balises : vent © contributeurs du réseau <a href="https://openwindmap.org" target="_blank" rel="noopener">OpenWindMap</a>.</p>

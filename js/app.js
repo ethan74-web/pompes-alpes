@@ -5,6 +5,7 @@ import { addDays, isoDate, MODELS, DEFAULT_MODEL, fetchEnsemble } from "./weathe
 import { drawBank, drawProfile, pause3D, pumpText, showPump3D } from "./pump3d.js";
 import { GLIDERS } from "./model.js";
 import { compareFlight, findThermals, flightStats, localHour, parseIGC } from "./igc.js";
+import { openReplay3D, pauseReplay3D, setFollow, setReplaySpots, updateReplay3D } from "./replay3d.js";
 
 const $ = id => document.getElementById(id);
 const H0 = 7, H1 = 21;
@@ -121,7 +122,8 @@ function onReady(meta) {
   setInterval(() => { if ($("showLive").checked && document.visibilityState === "visible") refreshLive(); }, 300e3);
   refreshLive();
   $("igc").addEventListener("change", e => loadFlights(e.target.files));
-  $("flightClear").addEventListener("click", () => { st.flights = []; st.flight = null; flightLayer.clearLayers(); drawFlightList(); $("flightText").textContent = ""; $("flightTable").innerHTML = ""; });
+  $("flightClear").addEventListener("click", () => { st.flights = []; st.flight = null; flightLayer.clearLayers(); drawFlightList(); $("flightText").textContent = ""; $("flightTable").innerHTML = ""; stopReplay(); });
+  initReplay();
   for (const ev of ["dragover", "drop"]) $("map").addEventListener(ev, e => {
     if (!e.dataTransfer || ![...e.dataTransfer.items || []].some(i => i.kind === "file")) return;
     e.preventDefault();
@@ -185,6 +187,7 @@ function onWorker(m) {
     if (m.h === st.hour) render();
     drawDayChart(); drawField();
     setStatus(`Calcul ${st.hours.size}/${H1 - H0 + 1}…`);
+    if (rp.fl) drawReplay(true);
   } else if (m.type === "dayDone") {
     st.done = true;
     setStatus(`${st.source} · ${modelName(st.model)} · ${labelDate(st.date)}`);
@@ -193,6 +196,7 @@ function onWorker(m) {
     st.dayScores.set(st.date, best);
     paintDays();
     if (st.flight && st.flight.F.date === st.date) showFlight();
+    if (rp.fl) drawReplay(true);
     if (st.week && st.weekRange && st.week.includes(st.date)) {        // pas d'aperçu de la semaine pour un jour ancien
       const dates = st.week.filter(d => !st.dayScores.has(d));
       if (dates.length) worker.postMessage({ type: "overview", token: st.token, dates, start: st.weekRange[0], end: st.weekRange[1], model: st.model });
@@ -533,6 +537,7 @@ function selectFlight(fl) {
   if (first) { st.hour = Math.min(H1, Math.max(H0, Math.round(first.h))); $("hour").value = st.hour; }
   if (st.date === fl.F.date && st.done) showFlight();
   else { $("flightText").textContent = `Calcul de la prévision du ${labelDate(fl.F.date)}…`; selectDate(fl.F.date, !(st.week && st.week.includes(fl.F.date))); }
+  prepReplay(fl);
 }
 function spotsAt(h) {
   const X = st.hours.get(h);
@@ -578,6 +583,259 @@ function showFlight() {
     st.hour = Math.min(H1, Math.max(H0, Math.round(T.h))); $("hour").value = st.hour; stopPlay(); render();
     map.setView([T.lat, T.lon], Math.max(map.getZoom(), 12));
   });
+}
+
+// ---------------------------------------------------------------- base de vols et rejeu accéléré
+// Les vols de la base (data/vols/) ou une trace IGC chargée : le planeur avance en accéléré, la carte (ou la vue 3D)
+// montre les pompes prévues à l'heure du rejeu, et le bandeau compare ce que vit le planeur à la prévision.
+const rp = { fl: null, t: 0, t0: 0, t1: 1, k: 0, playing: false, last: 0, three: false, drawn: 0, info: 0, drag: false };
+let rpTrail = null, rpGlider = null, elevP = null;
+const D2R = Math.PI / 180;
+
+function initReplay() {
+  rpTrail = L.layerGroup().addTo(map);
+  $("rpPlay").addEventListener("click", () => {
+    if (!rp.fl) return;
+    if (!rp.playing && rp.t >= rp.t1 - 1) rp.t = rp.t0;
+    rp.playing = !rp.playing; rp.last = performance.now();
+    // au lancement : vue rapprochée sur le planeur, pour voir les zones des pompes
+    if (rp.playing && !rp.three && $("rpFollow").checked && map.getZoom() < 10.75 && rpGlider) map.setView(rpGlider.getLatLng(), 11.25);
+    $("rpPlay").textContent = rp.playing ? "❚❚" : "▶";
+  });
+  $("rpTime").addEventListener("input", e => { rp.t = rp.t0 + (+e.target.value / 1000) * (rp.t1 - rp.t0); rp.drag = true; drawReplay(true); });
+  $("rpTime").addEventListener("change", () => { rp.drag = false; });
+  $("rpNext").addEventListener("click", () => {
+    if (!rp.fl) return;
+    const T = rp.fl.th.find(T => T.t0 > rp.t + 10 && T.gain >= 100);
+    if (T) { rp.t = Math.max(rp.t0, T.t0 - 20); drawReplay(true); }
+  });
+  $("rpFollow").addEventListener("change", e => setFollow(e.target.checked));
+  $("rp3d").addEventListener("click", () => toggle3D(!rp.three));
+  const loop = now => {
+    requestAnimationFrame(loop);
+    if (!rp.fl || !rp.playing) return;
+    const dt = Math.min(0.25, (now - rp.last) / 1000);
+    rp.last = now;
+    rp.t += dt * +$("rpSpeed").value;
+    if (rp.t >= rp.t1) { rp.t = rp.t1; rp.playing = false; $("rpPlay").textContent = "▶"; }
+    drawReplay();
+  };
+  requestAnimationFrame(loop);
+  initBase();
+}
+
+async function initBase() {
+  let I;
+  try { const r = await fetch("data/vols/index.json"); if (!r.ok) return; I = await r.json(); } catch (e) { return; }
+  st.base = I;
+  const ps = $("volPilot");
+  for (const p of I.pilotes) { const o = document.createElement("option"); o.value = p.p; o.textContent = `${p.nom} (${p.n} vols)`; ps.appendChild(o); }
+  const fill = () => {
+    const vs = $("volSel"); vs.innerHTML = "<option value=''>— choisir un vol —</option>";
+    for (const v of I.vols.filter(v => v.p === ps.value).sort((a, b) => b.date.localeCompare(a.date))) {
+      const o = document.createElement("option"); o.value = v.id;
+      o.textContent = `${v.date.split("-").reverse().join("/")} · ${v.km ? v.km + " km · " : ""}${Math.floor(v.min / 60)} h ${String(v.min % 60).padStart(2, "0")} · ${v.planeur}${v.terrain && !/Challes/.test(v.terrain) ? " · " + v.terrain : ""}`;
+      vs.appendChild(o);
+    }
+  };
+  ps.addEventListener("change", () => { store.set("volPilot", ps.value); fill(); });
+  $("volSel").addEventListener("change", e => { const v = I.vols.find(v => String(v.id) === e.target.value); if (v) loadBaseFlight(v); });
+  const want = new URLSearchParams(location.search).get("vol"), wv = want && I.vols.find(v => String(v.id) === want);
+  ps.value = wv ? wv.p : I.pilotes.some(p => p.p === store.get("volPilot")) ? store.get("volPilot") : I.pilotes[0].p;
+  fill();
+  $("baseBox").hidden = false;
+  if (wv) { $("volSel").value = String(wv.id); loadBaseFlight(wv); }
+}
+
+function decodeTrack(buf, date) {
+  const h = new Int32Array(buf, 0, 5), n = h[0], d = new Int16Array(buf, 20, (n - 1) * 4);
+  let t = h[1], la = h[2], lo = h[3], a = h[4];
+  const fixes = [{ t, lat: la / 1e5, lon: lo / 1e5, alt: a }];
+  for (let k = 0; k < n - 1; k++) {
+    t += d[4 * k]; la += d[4 * k + 1]; lo += d[4 * k + 2]; a += d[4 * k + 3];
+    fixes.push({ t, lat: la / 1e5, lon: lo / 1e5, alt: a });
+  }
+  return { date, fixes };
+}
+
+async function loadBaseFlight(v) {
+  st.flights = st.flights || [];
+  let fl = st.flights.find(f => f.baseId === v.id);
+  if (!fl) {
+    setStatus("Chargement de la trace…");
+    try {
+      const r = await fetch(`data/vols/${v.id}.bin`);
+      if (!r.ok) throw new Error(r.status);
+      const F = decodeTrack(await r.arrayBuffer(), v.date);
+      const p = st.base.pilotes.find(p => p.p === v.p);
+      fl = { name: `${p ? p.nom : "pilote"} · ${v.planeur}`, F, th: findThermals(F), baseId: v.id };
+    } catch (e) { setStatus("Trace indisponible : " + e.message, true); return; }
+    st.flights.push(fl);
+  }
+  selectFlight(fl);
+}
+
+/** Grandeurs de chaque point : Vz sur ±10 s, vitesse sol sur ±6 s, cap, inclinaison déduite du taux de virage. */
+function flightKinematics(F) {
+  const P = F.fixes, n = P.length, vz = new Float32Array(n), gs = new Float32Array(n), hd = new Float32Array(n), bank = new Float32Array(n);
+  const E = (a, b) => (b.lon - a.lon) * D2R * 6371000 * Math.cos(a.lat * D2R), N = (a, b) => (b.lat - a.lat) * D2R * 6371000;
+  for (let k = 0, a = 0, b = 0; k < n; k++) {
+    while (P[a].t < P[k].t - 10) a++;
+    while (b < n - 1 && P[b + 1].t <= P[k].t + 10) b++;
+    vz[k] = b > a ? (P[b].alt - P[a].alt) / (P[b].t - P[a].t) : 0;
+    const p = P[Math.max(0, k - 1)], q = P[Math.min(n - 1, k + 1)], dt = Math.max(1, q.t - p.t);
+    hd[k] = Math.atan2(E(p, q), N(p, q));
+    gs[k] = Math.hypot(E(p, q), N(p, q)) / dt;
+  }
+  for (let k = 0; k < n; k++) {
+    const a = Math.max(0, k - 2), b = Math.min(n - 1, k + 2);
+    let d = 0;
+    for (let q = a; q < b; q++) { let x = hd[q + 1] - hd[q]; x -= 2 * Math.PI * Math.round(x / (2 * Math.PI)); d += x; }
+    const w = d / Math.max(1, P[b].t - P[a].t);
+    bank[k] = Math.max(-1.05, Math.min(1.05, Math.atan(gs[k] * w / 9.81)));
+  }
+  return { vz, gs, hd, bank };
+}
+
+function ensureElev() {
+  if (!elevP) elevP = (async () => {
+    for (let k = 0; k < 5; k++) {
+      try {
+        const r = await fetch("data/elev.i16" + (st.meta.dataVersion ? "?v=" + st.meta.dataVersion : ""));
+        if (r.ok) return new Int16Array(await r.arrayBuffer());
+      } catch (e) { /* nouvel essai */ }
+      await new Promise(ok => setTimeout(ok, 800 * (k + 1)));
+    }
+    elevP = null;
+    return null;
+  })();
+  return elevP;
+}
+function groundAt(lat, lon) {
+  const m = st.meta, E = st.elev;
+  if (!E) return null;
+  const i = Math.floor((lon - m.west) / (m.east - m.west) * m.nx), j = Math.floor((m.north - lat) / (m.north - m.south) * m.ny);
+  return i < 0 || j < 0 || i >= m.nx || j >= m.ny ? null : E[j * m.nx + i];
+}
+
+function prepReplay(fl) {
+  fl.kin = fl.kin || flightKinematics(fl.F);
+  rp.fl = fl; rp.playing = false; rp.k = 0;
+  const P = fl.F.fixes;
+  rp.t0 = P[0].t; rp.t1 = P[P.length - 1].t;
+  // départ : un peu avant la première spirale avec du gain (le remorquage ou le treuil passent vite)
+  const first = fl.th.find(T => T.gain >= 200);
+  rp.t = first ? Math.max(rp.t0, first.t0 - 120) : rp.t0;
+  $("rpPlay").textContent = "▶";
+  $("replayBar").hidden = false;
+  if (!rpGlider) rpGlider = L.marker(map.getCenter(), { interactive: false, keyboard: false, zIndexOffset: 2000,
+    icon: L.divIcon({ className: "glider-ico", iconSize: [40, 40], iconAnchor: [20, 20],
+      html: `<svg width="40" height="40" viewBox="-17 -17 34 34" style="filter:drop-shadow(0 0 2px #000)"><g stroke="#0b0d0e" stroke-width="2.2" stroke-linejoin="round" paint-order="stroke" fill="#ffffff"><path d="M-15 -1.5 L15 -1.5 L15 1 L-15 1 Z"/><path d="M-1.3 -9 L1.3 -9 L1 13 L-1 13 Z"/><path d="M-5 11 L5 11 L5 13 L-5 13 Z"/></g></svg>` }) });
+  rpGlider.addTo(map);
+  ensureElev().then(E => { st.elev = E; drawReplay(true); });
+  if (rp.three) toggle3D(true);
+  drawReplay(true);
+}
+
+function stopReplay() {
+  rp.fl = null; rp.playing = false;
+  $("replayBar").hidden = true;
+  if (rp.three) toggle3D(false);
+  if (rpTrail) rpTrail.clearLayers();
+  if (rpGlider) rpGlider.remove();
+}
+
+async function toggle3D(on) {
+  rp.three = on;
+  $("rp3d").classList.toggle("on", on);
+  $("rp3d").textContent = on ? "Carte" : "3D";
+  $("view3d").hidden = !on;
+  if (!on) { pauseReplay3D(); return; }
+  const E = await ensureElev();
+  if (!E) { setStatus("Relief indisponible pour la 3D", true); return; }
+  st.elev = E;
+  try {
+    await openReplay3D($("view3d"), { meta: st.meta, elev: E, F: rp.fl.F, vz: rp.fl.kin.vz });
+    setFollow($("rpFollow").checked);
+  } catch (e) { setStatus("Vue 3D impossible : " + e.message, true); return; }
+  drawReplay(true);
+}
+
+const vzCol = v => v >= 0.2 ? css(SCALES.climb.col(Math.min(6, v))) : v > -1 ? "#d4dade" : "#6d9ef2";
+const sgn = x => (x >= 0 ? "+" : "−") + fr(Math.abs(x));
+
+function drawReplay(force = false) {
+  const fl = rp.fl;
+  if (!fl) return;
+  const P = fl.F.fixes, n = P.length;
+  let k = Math.min(rp.k, n - 2);
+  while (k > 0 && P[k].t > rp.t) k--;
+  while (k < n - 2 && P[k + 1].t <= rp.t) k++;
+  rp.k = k;
+  const a = P[k], b = P[k + 1], frac = Math.max(0, Math.min(1, (rp.t - a.t) / Math.max(1, b.t - a.t)));
+  const lat = a.lat + (b.lat - a.lat) * frac, lon = a.lon + (b.lon - a.lon) * frac, alt = a.alt + (b.alt - a.alt) * frac;
+  const K = fl.kin, hd = K.hd[k], bank = K.bank[k];
+  // heure de la prévision affichée : celle du rejeu
+  const lh = localHour(fl.F.date, rp.t), hr = Math.min(H1, Math.max(H0, Math.round(lh)));
+  if (hr !== st.hour && st.date === fl.F.date) { st.hour = hr; $("hour").value = hr; render(); }
+  $("rpClock").textContent = hm(lh);
+  if (!rp.drag) $("rpTime").value = Math.round((rp.t - rp.t0) / Math.max(1, rp.t1 - rp.t0) * 1000);
+  // planeur et traîne des 12 dernières minutes, colorée par la Vz
+  const ll = L.latLng(lat, lon);
+  rpGlider.setLatLng(ll);
+  const g = rpGlider.getElement();
+  if (g && g.firstChild) g.firstChild.style.transform = `rotate(${hd / D2R}deg)`;
+  const now = performance.now();
+  if (force || now - rp.drawn > 120) {
+    rp.drawn = now;
+    rpTrail.clearLayers();
+    let s = k;
+    while (s > 0 && P[s].t > rp.t - 720) s--;
+    let run = [[P[s].lat, P[s].lon]], col = vzCol(K.vz[s]);
+    for (let q = s + 1; q <= k + 1; q++) {
+      const pt = q === k + 1 ? [lat, lon] : [P[q].lat, P[q].lon], c = vzCol(K.vz[Math.min(q, k)]);
+      run.push(pt);
+      if (c !== col || q === k + 1) {
+        rpTrail.addLayer(L.polyline(run, { color: "#0b0d0e", weight: 6, opacity: 0.55, interactive: false }));
+        rpTrail.addLayer(L.polyline(run, { color: col, weight: 3.5, opacity: 1, interactive: false }));
+        run = [pt]; col = c;
+      }
+    }
+    if (!rp.three && $("rpFollow").checked) {
+      const sz = map.getSize(), bar = $("replayBar").offsetHeight + 20, m = [sz.x * 0.25, sz.y * 0.22];
+      map.panInside(ll, { paddingTopLeft: m, paddingBottomRight: [m[0], m[1] + bar], animate: true, duration: 0.6 });
+    }
+  }
+  if (rp.three) {
+    updateReplay3D(k, frac, hd, bank);
+    setReplaySpots(st.date === fl.F.date ? spotsAt(st.hour) : null, +$("minProb").value / 100, `${st.token}:${st.hour}:${$("minProb").value}`);
+  }
+  if (force || now - rp.info > 200) { rp.info = now; replayInfo(fl, k, lat, lon, alt); }
+}
+
+function replayInfo(fl, k, lat, lon, alt) {
+  const K = fl.kin, gr = groundAt(lat, lon), out = [];
+  out.push(`<b>${km(alt)} m</b>${gr != null ? ` (${km(Math.max(0, alt - gr))} m sol)` : ""} · vario <b>${sgn(K.vz[k])}</b> m/s · ${Math.round(K.gs[k] * 3.6)} km/h sol`);
+  if (st.date !== fl.F.date) { out.push(`<span class="muted">La carte montre un autre jour que le vol.</span>`); $("rpInfo").innerHTML = out.join("<br>"); return; }
+  if (!st.hours.has(st.hour)) { out.push(`<span class="muted">Prévision du jour en cours de calcul…</span>`); $("rpInfo").innerHTML = out.join("<br>"); return; }
+  if (!L.latLngBounds(bounds).contains([lat, lon])) { out.push(`<span class="muted">Hors de la zone de prévision.</span>`); $("rpInfo").innerHTML = out.join("<br>"); return; }
+  const T = fl.th.find(T => rp.t >= T.t0 && rp.t <= T.t1);
+  const S = (spotsAt(st.hour) || []).filter(s => s.prob >= +$("minProb").value / 100 && s.vz >= 0.3);
+  // pompe prévue la plus proche (centre de la zone où on la trouve)
+  let best = null, bd = 1e9;
+  for (const s of S) {
+    const [clat, clon] = offset(s.lat, s.lon, s.ex, s.ey), d = Math.hypot((clon - lon) * 111320 * Math.cos(lat * D2R), (clat - lat) * 111320);
+    if (d < bd) { bd = d; best = { s, clat, clon }; }
+  }
+  const where = best ? (bd < 300 ? "ici" : `à ${bd < 1000 ? Math.round(bd / 50) * 50 + " m" : fr(bd / 1000) + " km"} ${vers((Math.atan2((best.clon - lon) * Math.cos(lat * D2R), best.clat - lat) / D2R + 360) % 360)}`) : "";
+  const pred = best ? `+${fr(Math.max(0, best.s.vz))} m/s, plafond ${km(best.s.ceil)} m, fiabilité ${pct(best.s.prob)}` : "";
+  if (T && T.gain >= 50) {
+    const sofar = Math.max(1, rp.t - T.t0), gain = alt - T.base;
+    out.push(`<b>En spirale</b> depuis ${Math.round(sofar / 60)} min : ${sgn(gain / sofar)} m/s en moyenne${T.t1 - rp.t < 30 ? ` · bilan : ${sgn(T.climb)} m/s jusqu'à ${km(T.top)} m` : ""}`
+      + (best && bd < 2500 ? ` · <span class="pred">prévu ${where} : ${pred}</span>` : ` · <span class="muted">aucune pompe prévue à moins de 2,5 km</span>`));
+  } else if (best && bd < 10000) out.push(`Pompe prévue la plus proche ${where} : <span class="pred">${pred}</span>`);
+  else out.push(`<span class="muted">Aucune pompe prévue à moins de 10 km au-dessus du seuil de fiabilité.</span>`);
+  $("rpInfo").innerHTML = out.join("<br>");
 }
 
 // ---------------------------------------------------------------- export des pompes du jour (.cup : SeeYou, XCSoar)

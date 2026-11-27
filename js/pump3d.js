@@ -17,7 +17,7 @@ function loadScript(src) {
     document.head.appendChild(s);
   });
 }
-function three() {
+export function three() {
   if (!threeP) threeP = (async () => {
     await loadScript("https://unpkg.com/three@0.128.0/build/three.min.js");
     await loadScript("https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js");
