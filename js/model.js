@@ -65,7 +65,7 @@ export const PARAM = {
   shelterDeg: [2, 14],      // abri : vent plein si le relief au vent est vu sous moins de 2°, réduit au minimum au-delà de 14°
   // vol de pente : coefficients recalés sur le vent du modèle (calib/pente_banc.js, 24/11/2026), ligne droite à vKmh ; a : air qui monte devant les pentes de jour
   waveHigh: null,           // [12.5, 0.8] : onde cherchée aussi entre 3 500 et 4 500 m (vent > 45 km/h) — essayé le 24/11/2026, non confirmé par les vols : désactivé
-  ridge: { a: 0.56, b: 0.151, c: 0.147, d: 1.30, kWind: 1, dni: 850, minSlope: 0.36, vKmh: 90 },
+  ridge: { a: 0.66, b: 0.124, c: 0.118, d: 1.24, kWind: 1, dni: 850, minSlope: 0.36, vKmh: 90 },
   shelterMin: 0.1,          // part du vent qui atteint encore un versant abrité (décollement sous la crête)
   entL: 2000,               // entraînement : la particule perd son excès de chaleur sur cette distance (m)
   q0: 2e9,                  // chaleur collectée de référence (W) pour l'indice d'alimentation
